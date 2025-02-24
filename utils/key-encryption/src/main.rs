@@ -6,7 +6,6 @@ use rand::Rng;
 use dotenv::dotenv;
 use std::env;
 use hex;
-use secp256k1::{SecretKey, PublicKey, Secp256k1};
 
 fn main() {
     // Load environment variables from .env file
@@ -21,8 +20,6 @@ fn main() {
     // Hash the encryption key using Keccak-256 to derive a 32-byte key
     let mut hasher = Keccak::v256(); // Initialize Keccak-256 hasher
     let mut hash_result = [0u8; 32]; // Keccak-256 produces a 32-byte hash
-    //println!("{:02x?}",encryption_key.as_bytes());
-    //let encryption_key: Vec<u8> =  vec!{0x6d, 0x79, 0x70, 0x61, 0x73};
     hasher.update(encryption_key.as_bytes()); // Update with the key bytes
     hasher.finalize(&mut hash_result); // Finalize and store the result
     let key: [u8; 32] = hash_result; // Convert to 32-byte array
@@ -41,25 +38,5 @@ fn main() {
     println!("IV: [{}]", iv_formatted.join(", "));
     let chipertext_formatted: Vec<String> = ciphertext.iter().map(|byte| format!("0x{:02x}", byte)).collect();
     println!("Ciphertext: [{}]", chipertext_formatted.join(", "));
-/*
-    let private_key_bytes = plaintext;
-    let secp = Secp256k1::new();
-    // Parse the private key
-    let secret_key = SecretKey::from_slice(&private_key_bytes).expect("Invalid private key");
-
-    // Derive the public key
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-
-    // Serialize the public key to compressed or uncompressed format
-    let compressed_public_key = public_key.serialize(); // Compressed (33 bytes)
-    let uncompressed_public_key = public_key.serialize_uncompressed(); // Uncompressed (65 bytes)
-
-    // Convert the public key to hex
-    let compressed_public_key_hex = hex::encode(compressed_public_key);
-    let uncompressed_public_key_hex = hex::encode(&uncompressed_public_key[1..]); // Exclude the leading '0x04'
-
-    println!("Compressed Public Key: {}", compressed_public_key_hex);
-    println!("Uncompressed Public Key: {}", uncompressed_public_key_hex);
-*/
 
 }
