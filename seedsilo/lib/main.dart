@@ -101,13 +101,15 @@ class _PasswordScreenState extends State<PasswordScreen> {
 
     await Future.delayed(Duration(seconds: 2));
 
-    final buffer = widget.port.read(65);
+    final buffer = widget.port.read(66);
     // String hexResponse = buffer.map((byte) => '0x${byte.toRadixString(16).padLeft(2, '0')}').join(', ');
     if (buffer[0] == 0xF0) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => DashboardScreen(port: widget.port, publicKey: buffer.sublist(1))),
+        MaterialPageRoute(builder: (context) => DashboardScreen(port: widget.port, publicKey: buffer.sublist(2))),
       );
+    } else {
+      throw Exception('Cannot get public key');
     }
   }
 
@@ -126,8 +128,10 @@ class _PasswordScreenState extends State<PasswordScreen> {
 }
 
   String getEthereumAddressFromPublicKey(Uint8List publicKey) {
+      print("pub key ${hex.encode(publicKey)}");
       Uint8List hashedKey = keccak256(publicKey);
       Uint8List addressBytes = Uint8List.fromList(hashedKey.sublist(12));
+      print("address ${hex.encode(addressBytes)}");
       return hex.encode(addressBytes);
   }
 

@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <mbedtls/aes.h>
-#include <uECC.h> // Micro-ECC library
 #include <KeccakCore.h>
 
 #include "secp256k1/include/secp256k1_recovery.h"
@@ -13,9 +12,8 @@
 #define CMD_SIGN 0x03
 
 #define RESPONSE_OK 0xF0
+#define RESPONSE_FAIL 0xF1
 #define ERROR_WRONG_CMD 0x01
-
-#define uECC_SUPPORTS_secp256k1 1
 
 uint8_t ZEROS[32] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -48,12 +46,33 @@ void decrypt_private_key(uint8_t *key, uint8_t *output) {
     mbedtls_aes_free(&aes);
 }
 
-void get_public_key(uint8_t *private_key, uint8_t *output) {
-    uECC_compute_public_key(private_key, output, uECC_secp256k1());
-    // TODO secp256k1_ec_pubkey_create
+// get public key
+// 1 - success
+// 0 - fail
+int get_public_key(uint8_t *private_key, uint8_t *output) {
+    secp256k1_context *ctx;
+    ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+
+    secp256k1_pubkey pubkey;
+    if (!secp256k1_ec_pubkey_create(ctx, &pubkey, private_key)) {
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+
+    size_t len = 65;
+    if (!secp256k1_ec_pubkey_serialize(ctx, output, &len, &pubkey, SECP256K1_EC_UNCOMPRESSED)) {
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+
+    secp256k1_context_destroy(ctx);
+    return 1;
 }
 
-void sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, uint8_t* rec_id) {
+// sign
+// 1 - success
+// 0 - fail
+int sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, uint8_t* rec_id) {
     secp256k1_context *ctx;
     ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
 
@@ -62,14 +81,21 @@ void sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, uint8_t*
 
     secp256k1_ecdsa_recoverable_signature signature;
     memset(&signature, 0, sizeof(signature));
-    if (secp256k1_ecdsa_sign_recoverable(ctx, &signature, message_hash,  private_key, noncefn, data_) == 0) {
-        return;
+    if (!secp256k1_ecdsa_sign_recoverable(ctx, &signature, message_hash,  private_key, noncefn, data_)) {
+        secp256k1_context_destroy(ctx);
+        return 0;
     }
 
     // Should be safe to cast rec_id to int
     // I have no idea why rec_id is int,
     // because we will write only one byte to it *recid = sig->data[64];
-    secp256k1_ecdsa_recoverable_signature_serialize_compact(ctx, output, (int *)rec_id, &signature);
+    if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(ctx, output, (int *)rec_id, &signature)){
+        secp256k1_context_destroy(ctx);
+        return 0;
+    }
+
+    secp256k1_context_destroy(ctx);
+    return 1;
 }
 
 
@@ -98,16 +124,21 @@ void loop() {
                     uint8_t private_key[32];
                     decrypt_private_key(key_hash, private_key);
 
-                    uint8_t public_key[64];
-                    get_public_key(private_key, public_key);
+                    uint8_t public_key[65] = {0};
+                    int response = get_public_key(private_key, public_key);
 
                     memcpy(private_key, ZEROS, 32);
 
-                    uint8_t response_ok[65];
+                    uint8_t response_ok[66];
+                    if (response) {
+                        response_ok[0] = RESPONSE_OK;
+                    } else {
+                        response_ok[0] = RESPONSE_FAIL;
+                    }
                     response_ok[0] = RESPONSE_OK;
-                    memcpy(response_ok+1, public_key, 64);
+                    memcpy(response_ok+1, public_key, 65);
 
-                    Serial.write(response_ok, 65);
+                    Serial.write(response_ok, 66);
 
                     break;
                 }
@@ -126,12 +157,16 @@ void loop() {
 
                     uint8_t signature[64] = {0}; // TODO 64
                     uint8_t rec_id[1] = {0};
-                    sign(private_key, message_hash, signature, rec_id);
+                    int response = sign(private_key, message_hash, signature, rec_id);
 
                     memcpy(private_key, ZEROS, 32);
 
                     uint8_t response_ok[66];
-                    response_ok[0] = RESPONSE_OK;
+                    if (response) {
+                        response_ok[0] = RESPONSE_OK;
+                    } else {
+                        response_ok[0] = RESPONSE_FAIL;
+                    }
                     memcpy(response_ok+1, signature, 64);
                     memcpy(response_ok+65, &rec_id, 1);
 
