@@ -37,6 +37,7 @@ fn main() {
     let iv_formatted: Vec<String> = iv.iter().map(|byte| format!("0x{:02x}", byte)).collect();
     println!("IV: [{}]", iv_formatted.join(", "));
     let chipertext_formatted: Vec<String> = ciphertext.iter().map(|byte| format!("0x{:02x}", byte)).collect();
+    println!("Ciphertext len: {}", chipertext_formatted.len());
     println!("Ciphertext: [{}]", chipertext_formatted.join(", "));
 
 }
