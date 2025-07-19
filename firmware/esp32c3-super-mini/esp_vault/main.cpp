@@ -69,6 +69,9 @@ int get_public_key(uint8_t *private_key, uint8_t *output) {
     return 1;
 }
 
+// sign
+// 1 - success
+// 0 - fail
 int sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, uint8_t* rec_id) {
     secp256k1_context *ctx;
     ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
