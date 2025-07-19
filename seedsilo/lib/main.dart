@@ -155,6 +155,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     getBalance();
   }
 
+  void test() async {
+    print("test");
+    final transaction = Transaction(
+      to: EthereumAddress.fromHex("0x76ef45f325e6e2109e417f9b80ab6d2de31544fe"),
+      value: EtherAmount.fromBigInt(EtherUnit.wei, BigInt.parse("0xaa87bee538000")), // Sending 0.01 ETH
+      maxGas: 0x5208,//21000, // Standard ETH transfer gas limit
+      nonce: 0x9,
+      maxFeePerGas:EtherAmount.fromBigInt(EtherUnit.wei, BigInt.parse("0xf4247")),
+      maxPriorityFeePerGas: EtherAmount.fromBigInt(EtherUnit.wei, BigInt.parse("0xf4247")),
+      data: Uint8List.fromList([]),
+    );
+
+    // Convert to RLP-encoded raw transaction (without signing)
+    final rawTransaction = transaction.getUnsignedSerialized(chainId: 0x4268);
+    print("Raw Transaction: ${bytesToHex(rawTransaction, include0x: false)}");
+
+    Uint8List txHash = keccak256(rawTransaction);
+    print("txHash: ${bytesToHex(txHash, include0x: false)}");
+    final keccakHash = keccak256(Uint8List.fromList("".codeUnits));
+    final request = [0x03];
+    request.addAll(keccakHash);
+    request.addAll(txHash);
+    widget.port.write(Uint8List.fromList(request));
+
+    await Future.delayed(Duration(seconds: 2));
+
+    final buffer = widget.port.read(66);
+
+    if (buffer[0] != 0xF0) {
+      print("Error returned");
+      Navigator.pop(context);
+      return;
+    }
+
+    // print buffer
+    print("esp> "+bytesToHex(buffer, include0x: false));
+
+  }
+
   Future<void> getBalance() async {
     final address = EthereumAddress.fromHex(widget.ethAddress);
     final balance = await web3.getBalance(address);
@@ -171,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child:Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('ETH Address: ${widget.ethAddress}'),
+            Text('ETH Address: 0x${widget.ethAddress}'),
             Text('ETH Balance: $ethBalance ETH'),
             ElevatedButton(
               onPressed: () {
@@ -183,6 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Text('Send ETH'),
             ),
             ElevatedButton(onPressed: () {}, child: Text('Send USDT')),
+            ElevatedButton(onPressed: test, child: Text('Test')),
           ],
         ),
       ),
@@ -282,7 +322,7 @@ class _SendEthScreenState extends State<SendEthScreen> {
 
     await Future.delayed(Duration(seconds: 2));
 
-    final buffer = widget.port.read(65);
+    final buffer = widget.port.read(66);
 
     if (buffer[0] != 0xF0) {
       print("Error returned");
@@ -290,30 +330,28 @@ class _SendEthScreenState extends State<SendEthScreen> {
       return;
     }
 
-
-    // recover v
-    int v = 0;
+    // signature
     final r = buffer.sublist(1, 33);
     final s = buffer.sublist(33, 65);
-    for (int i = 0; i < 4; i++) {
-      final sig = MsgSignature(
+    final v = buffer[65];
+
+    final sig = MsgSignature(
       BigInt.parse(bytesToHex(r),radix: 16),
       BigInt.parse(bytesToHex(s),radix: 16),
-      v+27);
+      v+27
+    );
       try {
         final recoveredPubkey = ecRecover(txHash, sig);
         final address = getEthereumAddressFromPublicKey(recoveredPubkey);
-        if (address == widget.ethAddress) {
-          break;
+        if (address != widget.ethAddress) {
+          print("Wrong signature!");
+          return;
         }
-
-        v += 1;
       } catch (e) {
-        v = 10;
         print("get error: $e");
-        break;
+        return;
       }
-    }
+
 
     if (v < 5) {
       final sig2sign = MsgSignature(
