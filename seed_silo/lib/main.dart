@@ -140,6 +140,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     getBalance();
   }
 
+  Uint8List intTo2Bytes(int value) {
+    final bytes = ByteData(2);
+    bytes.setUint16(0, value, Endian.big);
+    return bytes.buffer.asUint8List();
+  }
+
   void test() async {
     print("test");
     final transaction = Transaction(
@@ -155,13 +161,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Convert to RLP-encoded raw transaction (without signing)
     final rawTransaction = transaction.getUnsignedSerialized(chainId: 0x4268);
     print("Raw Transaction: ${bytesToHex(rawTransaction, include0x: false)}");
+    print("Raw Transaction length: ${rawTransaction.length}");
 
     Uint8List txHash = keccak256(rawTransaction);
     print("txHash: ${bytesToHex(txHash, include0x: false)}");
     final keccakHash = keccak256(Uint8List.fromList("".codeUnits));
     final request = [0x03];
     request.addAll(keccakHash);
-    request.addAll(txHash);
+    request.addAll(intTo2Bytes(rawTransaction.length));
+    request.addAll(rawTransaction);
     await SerialService().write(request);
 
     await Future.delayed(Duration(seconds: 2));
@@ -169,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final buffer = await SerialService().read(66);
 
     if (buffer[0] != 0xF0) {
-      print("Error returned");
+      print("Error returned ${buffer[0]}");
       Navigator.pop(context);
       return;
     }
@@ -266,6 +274,12 @@ class _SendEthScreenState extends State<SendEthScreen> {
     return list;
   }
 
+  Uint8List intTo2Bytes(int value) {
+    final bytes = ByteData(2);
+    bytes.setUint16(0, value, Endian.big);
+    return bytes.buffer.asUint8List();
+  }
+
   void sendEth() async {
     setState(() {
       _isSendDisabled = true;
@@ -301,7 +315,8 @@ class _SendEthScreenState extends State<SendEthScreen> {
     final keccakHash = keccak256(Uint8List.fromList(passwordController.text.codeUnits));
     final request = [0x03];
     request.addAll(keccakHash);
-    request.addAll(txHash);
+    request.addAll(intTo2Bytes(rawTransaction.length));
+    request.addAll(rawTransaction);
 
     await SerialService().write(request);
 
@@ -310,7 +325,7 @@ class _SendEthScreenState extends State<SendEthScreen> {
     final buffer = await SerialService().read(66);
 
     if (buffer[0] != 0xF0) {
-      print("Error returned");
+      print("Error returned ${buffer[0]}");
       Navigator.pop(context);
       return;
     }
