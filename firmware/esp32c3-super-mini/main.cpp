@@ -2,29 +2,15 @@
 #include <mbedtls/aes.h>
 
 extern "C" {
-    #include "sha3_keccak/sha3.h"
-  }
+    #include "sha3.h"
+}
 
-#include "secp256k1/include/secp256k1_recovery.h"
-#include "secp256k1/src/secp256k1_c.h"
-#include "secp256k1/src/module/recovery/main_impl.h"
+#include "secp256k1_recovery.h"
+#include "secp256k1_c.h"
+#include "module/recovery/main_impl.h"
+
 #include "input.h"
-
-#define CMD_CHECK_STATUS 0x01
-#define CMD_GET_PUBKEY 0x02
-#define CMD_SIGN 0x03
-
-#define RESPONSE_OK 0xF0
-#define RESPONSE_FAIL 0xF1
-#define ERROR_WRONG_CMD 0x01
-#define ERROR_WRONG_DATA_FORMAT 0x02
-
-uint8_t ZEROS[32] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
+#include "constants.h"
 
 void setup() {  //.......................setup
     Serial.begin(115200);
