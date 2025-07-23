@@ -36,18 +36,18 @@ class SerialService {
     return _port!.isOpen;
   }
 
-  Future<void> write(List<int> data) async {
+  Future<int?> write(List<int> data) async {
     if (!isConnected) {
       final ok = await connect();
-      if (!ok) throw Exception("Serial connection failed during write()");
+      if (!ok) return null;
     }
-    _port!.write(Uint8List.fromList(data));
+    return _port!.write(Uint8List.fromList(data));
   }
 
-  Future<Uint8List> read(int length) async {
+  Future<Uint8List?> read(int length) async {
     if (!isConnected) {
       final ok = await connect();
-      if (!ok) throw Exception("Serial connection failed during read()");
+      if (!ok) return null;
     }
     return _port!.read(length);
   }
