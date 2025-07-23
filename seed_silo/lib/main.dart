@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:seed_silo/service/hardware_wallet_service.dart';
-import 'dart:typed_data';
-import 'package:web3dart/web3dart.dart';
-import 'package:web3dart/crypto.dart';
-import 'package:convert/convert.dart';
-import 'package:http/http.dart' as http;
+import 'package:seed_silo/screens/preload_screen.dart';
+//import 'package:seed_silo/service/hardware_wallet_service.dart';
+//import 'dart:typed_data';
+//import 'package:web3dart/web3dart.dart';
+//import 'package:web3dart/crypto.dart';
+//import 'package:convert/convert.dart';
+//import 'package:http/http.dart' as http;
 
-final String rpcUrl = "https://ethereum-holesky-rpc.publicnode.com";
+//final String rpcUrl = "https://ethereum-holesky-rpc.publicnode.com";
 
 void main() {
   runApp(SeedSiloApp());
@@ -20,11 +21,11 @@ class SeedSiloApp extends StatelessWidget {
     return MaterialApp(
       title: 'Seed Silo',
       theme: ThemeData.dark(),
-      home: ConnectScreen(),
+      home: PreloadScreen(),
     );
   }
 }
-
+/*
 class ConnectScreen extends StatefulWidget {
   @override
   _ConnectScreenState createState() => _ConnectScreenState();
@@ -312,3 +313,4 @@ class _SendEthScreenState extends State<SendEthScreen> {
     );
   }
 }
+*/

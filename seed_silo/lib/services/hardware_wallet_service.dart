@@ -14,12 +14,13 @@ class HardwareWalletService {
   static const int getSignatureCmd = 0x03;
 
   Future<int?> getVersion() async {
-    await SerialService().write([getVersionCmd]);
+    final ok = await SerialService().write([getVersionCmd]);
+    if (ok == null) return null;
 
     await Future.delayed(Duration(seconds: 1));
 
     final buffer = await SerialService().read(1);
-    if (buffer[0] == 0xF0) {
+    if (buffer?[0] == 0xF0) {
       return 1;
     }
 
@@ -40,13 +41,14 @@ class HardwareWalletService {
     request.addAll(intTo2Bytes(rawTransaction.length));
     request.addAll(rawTransaction);
 
-    await SerialService().write(request);
+    final ok = await SerialService().write(request);
+    if (ok == null) return null;
 
     await Future.delayed(Duration(seconds: 2));
 
     final buffer = await SerialService().read(66);
 
-    if (buffer[0] != 0xF0) {
+    if (buffer == null || buffer[0] != 0xF0) {
       return null;
     }
 
@@ -67,14 +69,15 @@ class HardwareWalletService {
     final keccakHash = keccak256(Uint8List.fromList(password.codeUnits));
     final request = [getUncompressedPublicKeyCmd];
     request.addAll(keccakHash);
-    await SerialService().write(request);
+    final ok = await SerialService().write(request);
+    if (ok == null) return null;
 
     await Future.delayed(Duration(seconds: 2));
 
     final buffer = await SerialService().read(66);
     // String hexResponse = buffer.map((byte) => '0x${byte.toRadixString(16).padLeft(2, '0')}').join(', ');
-    if (buffer[0] == 0xF0) {
-      return buffer.sublist(2);
+    if (buffer?[0] == 0xF0) {
+      return buffer?.sublist(2);
     }
 
     return null;
