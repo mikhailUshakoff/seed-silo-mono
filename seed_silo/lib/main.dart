@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'dart:typed_data';
-import 'package:seed_silo/services/serial_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:convert/convert.dart';
@@ -38,13 +38,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
   }
 
   void connectToSerial() async {
-    await SerialService().write([0x01]);
-
-    await Future.delayed(Duration(seconds: 2));
-
-    final buffer = await SerialService().read(1);
-    // String hexResponse = buffer.map((byte) => '0x${byte.toRadixString(16).padLeft(2, '0')}').join(', ');
-    if (buffer[0] == 0xF0) {
+    final result = await HardwareWalletService().getVersion();
+        // String hexResponse = buffer.map((byte) => '0x${byte.toRadixString(16).padLeft(2, '0')}').join(', ');
+    if (result != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => PasswordScreen()),
@@ -75,20 +71,12 @@ class _PasswordScreenState extends State<PasswordScreen> {
     setState(() {
       _isBtnDisabled = true;
     });
-    final password = passwordController.text;
-    final keccakHash = keccak256(Uint8List.fromList(password.codeUnits));
-    final request = [0x02];
-    request.addAll(keccakHash);
-    await SerialService().write(request);
 
-    await Future.delayed(Duration(seconds: 2));
-
-    final buffer = await SerialService().read(66);
-    // String hexResponse = buffer.map((byte) => '0x${byte.toRadixString(16).padLeft(2, '0')}').join(', ');
-    if (buffer[0] == 0xF0) {
+    final result = await HardwareWalletService().getUncompressedPublicKey(passwordController.text);
+    if (result != null) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => DashboardScreen(publicKey: buffer.sublist(2))),
+        MaterialPageRoute(builder: (context) => DashboardScreen(publicKey: result)),
       );
     } else {
       throw Exception('Cannot get public key');
@@ -140,12 +128,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     getBalance();
   }
 
-  Uint8List intTo2Bytes(int value) {
-    final bytes = ByteData(2);
-    bytes.setUint16(0, value, Endian.big);
-    return bytes.buffer.asUint8List();
-  }
-
   void test() async {
     print("test");
     final transaction = Transaction(
@@ -165,25 +147,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     Uint8List txHash = keccak256(rawTransaction);
     print("txHash: ${bytesToHex(txHash, include0x: false)}");
-    final keccakHash = keccak256(Uint8List.fromList("".codeUnits));
-    final request = [0x03];
-    request.addAll(keccakHash);
-    request.addAll(intTo2Bytes(rawTransaction.length));
-    request.addAll(rawTransaction);
-    await SerialService().write(request);
+    final sig = await HardwareWalletService().getSignature("", rawTransaction);
 
-    await Future.delayed(Duration(seconds: 2));
-
-    final buffer = await SerialService().read(66);
-
-    if (buffer[0] != 0xF0) {
-      print("Error returned ${buffer[0]}");
-      Navigator.pop(context);
-      return;
+    if (sig == null) {
+      throw Exception('Cannot get signature');
     }
-
     // print buffer
-    print("esp> "+bytesToHex(buffer, include0x: false));
+    print("esp> r ${sig.r.toRadixString(16)} s ${sig.s.toRadixString(16)} v ${sig.v.toRadixString(16)}");
 
   }
 
@@ -274,12 +244,6 @@ class _SendEthScreenState extends State<SendEthScreen> {
     return list;
   }
 
-  Uint8List intTo2Bytes(int value) {
-    final bytes = ByteData(2);
-    bytes.setUint16(0, value, Endian.big);
-    return bytes.buffer.asUint8List();
-  }
-
   void sendEth() async {
     setState(() {
       _isSendDisabled = true;
@@ -311,64 +275,23 @@ class _SendEthScreenState extends State<SendEthScreen> {
       data: Uint8List.fromList([]),
     );
     final rawTransaction = transaction.getUnsignedSerialized(chainId: chainId.toInt());
-    Uint8List txHash = keccak256(rawTransaction);
-    final keccakHash = keccak256(Uint8List.fromList(passwordController.text.codeUnits));
-    final request = [0x03];
-    request.addAll(keccakHash);
-    request.addAll(intTo2Bytes(rawTransaction.length));
-    request.addAll(rawTransaction);
 
-    await SerialService().write(request);
-
-    await Future.delayed(Duration(seconds: 2));
-
-    final buffer = await SerialService().read(66);
-
-    if (buffer[0] != 0xF0) {
-      print("Error returned ${buffer[0]}");
+    final sig = await HardwareWalletService().getSignature(passwordController.text, rawTransaction);
+    if (sig == null) {
+      print("Error returned");
       Navigator.pop(context);
       return;
     }
 
-    // signature
-    final r = buffer.sublist(1, 33);
-    final s = buffer.sublist(33, 65);
-    final v = buffer[65];
-
-    final sig = MsgSignature(
-      BigInt.parse(bytesToHex(r),radix: 16),
-      BigInt.parse(bytesToHex(s),radix: 16),
-      v+27
-    );
-      try {
-        final recoveredPubkey = ecRecover(txHash, sig);
-        final address = getEthereumAddressFromPublicKey(recoveredPubkey);
-        if (address != widget.ethAddress) {
-          print("Wrong signature!");
-          return;
-        }
-      } catch (e) {
-        print("get error: $e");
-        return;
-      }
-
-
-    if (v < 5) {
-      final sig2sign = MsgSignature(
-        BigInt.parse(bytesToHex(r),radix: 16),
-        BigInt.parse(bytesToHex(s),radix: 16),
-        v);
-      final signedTransaction = _encodeEIP1559ToRlp(transaction, sig2sign, chainId);
-      final signedRlp = encode(signedTransaction);//rlp
-      Uint8List tx2Send = Uint8List.fromList(signedRlp);
-      if (transaction.isEIP1559) {
-         tx2Send = prependTransactionType(0x02, tx2Send);
-      }
-      String sendTxHash = await ethClient.sendRawTransaction(tx2Send);
-      print("Transaction sent! Hash: $sendTxHash with v: $v");
-    } else {
-      print("Wrong password!");
+    final signedTransaction = _encodeEIP1559ToRlp(transaction, sig, chainId);
+    final signedRlp = encode(signedTransaction);//rlp
+    Uint8List tx2Send = Uint8List.fromList(signedRlp);
+    if (transaction.isEIP1559) {
+       tx2Send = prependTransactionType(0x02, tx2Send);
     }
+    String sendTxHash = await ethClient.sendRawTransaction(tx2Send);
+    print("Transaction sent! Hash: $sendTxHash");
+
     Navigator.pop(context);
   }
 
