@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:seed_silo/services/hardware_wallet_service.dart';
+import 'package:seed_silo/service/hardware_wallet_service.dart';
 import 'dart:typed_data';
 import 'package:web3dart/web3dart.dart';
 import 'package:web3dart/crypto.dart';
