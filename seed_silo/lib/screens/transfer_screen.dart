@@ -28,8 +28,7 @@ class _TransferScreenState extends State<TransferScreen> {
     if (!_formKey.currentState!.validate()) return;
 
   final destination = _destinationController.text.trim();
-  final formatted = _amountController.text.trim();
-  //final raw = formatted.replaceAll(' ', '');
+  final amount = _amountController.text.replaceAll(' ', '');
 
   Navigator.push(
     context,
@@ -37,7 +36,7 @@ class _TransferScreenState extends State<TransferScreen> {
       builder: (_) => TransferConfirmScreen(
         token: widget.token,
         destination: destination,
-        amountFormatted: formatted,
+        amount: amount,
       ),
     ),
   );

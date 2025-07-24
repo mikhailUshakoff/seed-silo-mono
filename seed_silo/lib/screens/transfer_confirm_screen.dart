@@ -6,13 +6,13 @@ import 'package:seed_silo/models/token.dart';
 class TransferConfirmScreen extends StatefulWidget {
   final Token token;
   final String destination;
-  final String amountFormatted;
+  final String amount;
 
   const TransferConfirmScreen({
     super.key,
     required this.token,
     required this.destination,
-    required this.amountFormatted,
+    required this.amount,
   });
 
   @override
@@ -86,7 +86,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
           children: [
             Text('Token: ${widget.token.symbol}'),
             Text('Destination: ${widget.destination}'),
-            Text('Amount: ${widget.amountFormatted}'),
+            Text('Amount: ${widget.amount}'),
             const SizedBox(height: 16),
             TextFormField(
               controller: _passwordController,
@@ -107,13 +107,6 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
               SubmitSlider(
                 onSubmit: _submitTransaction,
               ),
-              /*SubmitSlider(
-                text: 'Slide to Submit',
-                outerColor: Theme.of(context).colorScheme.primary,
-                innerColor: Colors.white,
-                textStyle: const TextStyle(color: Colors.white),
-                onSubmit: _submitTransaction,
-              ),*/
             ] else ...[
               const Text('Transaction submitted!', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),

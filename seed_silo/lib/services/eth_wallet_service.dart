@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
 class EthWalletService {
@@ -11,7 +13,40 @@ class EthWalletService {
 
   static const String _tokensKey = 'tokens';
 
+  static const String rpcUrl = 'https://ethereum-holesky-rpc.publicnode.com';
+  static const String _ethAddress = '0x0000000000000000000000000000000000000000';
+
   List<Token> _tokens = [];
+
+  Future<void> buildTransaction(String from,String token, String dst, String amount) async {
+    final httpClient = http.Client();
+    final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
+
+    if (token == _ethAddress) {
+      final dstAddress = EthereumAddress.fromHex(dst);
+      final sender = EthereumAddress.fromHex(from);
+      int nonce = await ethClient.getTransactionCount(sender);
+
+      final chainId = await ethClient.getChainId();
+
+      final maxPriorityFeePerGas = EtherAmount.inWei(BigInt.from(1000000000));
+      EtherAmount baseFeePerGas = await ethClient.getGasPrice();
+      EtherAmount maxFeePerGas = EtherAmount.inWei(baseFeePerGas.getInWei * BigInt.from(2) + BigInt.from(1000000000));
+
+      final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
+      // Create an unsigned transaction
+      final transaction = Transaction(
+        to: dstAddress,
+        value:  value,
+        maxGas: 21000, // Standard ETH transfer gas limit
+        nonce: nonce,
+        maxFeePerGas: maxFeePerGas, // Fetched max fee
+        maxPriorityFeePerGas: maxPriorityFeePerGas, // Fetched priority fee
+        data: Uint8List.fromList([]),
+      );
+      final rawTransaction = transaction.getUnsignedSerialized(chainId: chainId.toInt());
+    }
+  }
 
   Future<List<Token>> getTokens() async {
     if (_tokens.isNotEmpty) return _tokens;
@@ -24,7 +59,7 @@ class EthWalletService {
       _tokens = [
         Token(
             symbol: 'ETH',
-            address: '0x0000000000000000000000000000000000000000',
+            address: _ethAddress,
             decimals: 18),
       ];
       await _saveTokens();
@@ -62,8 +97,7 @@ class EthWalletService {
 
   Future<Token?> _fetchTokenInfo(String address) async {
     try {
-      final Web3Client client =
-          Web3Client('https://ethereum-holesky-rpc.publicnode.com', Client());
+      final Web3Client client = Web3Client(rpcUrl, Client());
 
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
 
