@@ -24,8 +24,6 @@ class _FormattedAmountFieldState extends State<FormattedAmountField> {
   int _inputLength = 0;
   double _convertedValue = 0;
 
-  String get rawText => widget.controller.text.replaceAll(' ', '');
-
   @override
   void initState() {
     super.initState();
