@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:convert/convert.dart';
+import 'package:seed_silo/services/hardware_wallet_service.dart';
+import 'package:seed_silo/utils/nullify.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
@@ -14,11 +18,82 @@ class EthWalletService {
   static const String _tokensKey = 'tokens';
 
   static const String rpcUrl = 'https://ethereum-holesky-rpc.publicnode.com';
-  static const String _ethAddress = '0x0000000000000000000000000000000000000000';
+  static const String _ethAddress =
+      '0x0000000000000000000000000000000000000000';
+  static const String erc20Abi = '''
+      [
+        {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
+        {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},
+        {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"}
+      ]
+    ''';
 
   List<Token> _tokens = [];
+  Uint8List? _publicKey;
+  String? _walletAddress;
 
-  Future<void> buildTransaction(String from,String token, String dst, String amount) async {
+  // get wallet address
+  String get walletAddress {
+    if (_walletAddress == null) {
+      throw Exception('Wallet address has not been set');
+    }
+    return _walletAddress!;
+  }
+
+  String getEthereumAddressFromPublicKey(Uint8List publicKey) {
+    Uint8List hashedKey = keccak256(publicKey);
+    Uint8List addressBytes = Uint8List.fromList(hashedKey.sublist(12));
+    return '0x${hex.encode(addressBytes)}';
+  }
+
+  Future<String?> updateAddress(Uint8List textPassword) async {
+    final password = keccak256(textPassword);
+    nullify(textPassword);
+    _publicKey =
+        await HardwareWalletService().getUncompressedPublicKey(password);
+    if (_publicKey == null) {
+      _walletAddress = null;
+    } else {
+      _walletAddress = getEthereumAddressFromPublicKey(_publicKey!);
+    }
+    return _walletAddress;
+  }
+
+  Future<BigInt> getBalance(String token) async {
+    if (_walletAddress == null) return BigInt.from(0);
+    final httpClient = http.Client();
+    final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
+    final walletAddress = EthereumAddress.fromHex(_walletAddress!);
+    if (token == _ethAddress) {
+      final balance =
+          await ethClient.getBalance(walletAddress);
+      return balance as BigInt;
+    } else {
+      //ERC20 get balance
+      final EthereumAddress tokenAddress = EthereumAddress.fromHex(token);
+
+      final contract = DeployedContract(
+        ContractAbi.fromJson(erc20Abi, 'ERC20'),
+        tokenAddress,
+      );
+
+      final balanceFunction = contract.function('balanceOf');
+
+      final balance = await ethClient.call(
+        contract: contract,
+        function: balanceFunction,
+        params: [walletAddress],
+      );
+
+      // TODO remove
+      await Future.delayed(const Duration(seconds: 5));
+
+      return balance.first as BigInt;
+    }
+  }
+
+  Future<void> buildTransaction(
+      String from, String token, String dst, String amount) async {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
@@ -31,20 +106,22 @@ class EthWalletService {
 
       final maxPriorityFeePerGas = EtherAmount.inWei(BigInt.from(1000000000));
       EtherAmount baseFeePerGas = await ethClient.getGasPrice();
-      EtherAmount maxFeePerGas = EtherAmount.inWei(baseFeePerGas.getInWei * BigInt.from(2) + BigInt.from(1000000000));
+      EtherAmount maxFeePerGas = EtherAmount.inWei(
+          baseFeePerGas.getInWei * BigInt.from(2) + BigInt.from(1000000000));
 
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
       // Create an unsigned transaction
       final transaction = Transaction(
         to: dstAddress,
-        value:  value,
+        value: value,
         maxGas: 21000, // Standard ETH transfer gas limit
         nonce: nonce,
         maxFeePerGas: maxFeePerGas, // Fetched max fee
         maxPriorityFeePerGas: maxPriorityFeePerGas, // Fetched priority fee
         data: Uint8List.fromList([]),
       );
-      final rawTransaction = transaction.getUnsignedSerialized(chainId: chainId.toInt());
+      final rawTransaction =
+          transaction.getUnsignedSerialized(chainId: chainId.toInt());
     }
   }
 
@@ -57,10 +134,7 @@ class EthWalletService {
     if (jsonString == null) {
       // Default token ETH
       _tokens = [
-        Token(
-            symbol: 'ETH',
-            address: _ethAddress,
-            decimals: 18),
+        Token(symbol: 'ETH', address: _ethAddress, decimals: 18),
       ];
       await _saveTokens();
     } else {
@@ -73,7 +147,8 @@ class EthWalletService {
 
   Future<void> addToken(String address) async {
     // Check if already added
-    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) return;
+    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase()))
+      return;
 
     // Fetch token info (symbol, decimals) from blockchain
     final tokenInfo = await _fetchTokenInfo(address);

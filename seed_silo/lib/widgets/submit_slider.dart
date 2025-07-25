@@ -4,10 +4,12 @@ import 'package:slide_to_act/slide_to_act.dart';
 class SubmitSlider extends StatefulWidget {
   final Future<void> Function() onSubmit;
   final String label;
+  final bool enabled;
 
   const SubmitSlider({
     super.key,
     required this.onSubmit,
+    this.enabled = true,
     this.label = 'Slide to Submit',
   });
 
@@ -19,9 +21,10 @@ class _SubmitSliderState extends State<SubmitSlider> {
   @override
   Widget build(BuildContext context) {
     return SlideAction(
-      text: widget.label,
+      text: widget.enabled ? widget.label : 'Loading balance...',
+      enabled: widget.enabled,
       outerColor: Theme.of(context).colorScheme.primary,
-      innerColor: Theme.of(context).colorScheme.surface,
+      innerColor: widget.enabled ? Theme.of(context).colorScheme.surface : Theme.of(context).colorScheme.primary,
       textStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
       elevation: 0,
       animationDuration: const Duration(milliseconds: 300),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/screens/transfer_confirm_screen.dart';
+import 'package:seed_silo/services/eth_wallet_service.dart';
 import 'package:seed_silo/widgets/formatted_amount_field.dart';
 
 class TransferScreen extends StatefulWidget {
@@ -16,6 +18,10 @@ class _TransferScreenState extends State<TransferScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _destinationController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _passwordPosController = TextEditingController();
+
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -24,22 +30,39 @@ class _TransferScreenState extends State<TransferScreen> {
     super.dispose();
   }
 
-  void _onTransferPressed() {
+  Future<void> _onTransferPressed() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
-  final destination = _destinationController.text.trim();
-  final amount = _amountController.text.replaceAll(' ', '');
+    setState(() { _isLoading = true; });
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => TransferConfirmScreen(
-        token: widget.token,
-        destination: destination,
-        amount: amount,
+    final destination = _destinationController.text.trim();
+    final amount = _amountController.text.replaceAll(' ', '');
+    final address = await EthWalletService()
+        .updateAddress(Uint8List.fromList(_passwordController.text.codeUnits));
+    _passwordController.text = '';
+
+    if (!mounted) return;
+
+    setState(() { _isLoading = false; });
+
+    if (address == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not recieve address')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransferConfirmScreen(
+          token: widget.token,
+          destination: destination,
+          amount: amount,
+        ),
       ),
-    ),
-  );
+    );
   }
 
   @override
@@ -81,10 +104,43 @@ class _TransferScreenState extends State<TransferScreen> {
                   return null;
                 },
               ),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Please enter password'
+                    : null,
+              ),
+              TextFormField(
+                controller: _passwordPosController,
+                decoration: const InputDecoration(labelText: 'Password Pos'),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Please enter password position'
+                    : null,
+              ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _onTransferPressed,
-                child: const Text('Transfer'),
+                child: _isLoading
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Processing...'),
+                        ],
+                      )
+                    : const Text('Transfer'),
               ),
             ],
           ),

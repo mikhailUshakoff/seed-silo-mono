@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:seed_silo/services/serial_service.dart';
+import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/crypto.dart';
 
 class HardwareWalletService {
@@ -65,17 +66,16 @@ class HardwareWalletService {
     return sig;
   }
 
-  Future<Uint8List?> getUncompressedPublicKey(String password) async {
-    final keccakHash = keccak256(Uint8List.fromList(password.codeUnits));
+  Future<Uint8List?> getUncompressedPublicKey(Uint8List password) async {
     final request = [getUncompressedPublicKeyCmd];
-    request.addAll(keccakHash);
+    request.addAll(password);
     final ok = await SerialService().write(request);
+    nullify(password);
     if (ok == null) return null;
 
     await Future.delayed(Duration(seconds: 2));
 
     final buffer = await SerialService().read(66);
-    // String hexResponse = buffer.map((byte) => '0x${byte.toRadixString(16).padLeft(2, '0')}').join(', ');
     if (buffer?[0] == 0xF0) {
       return buffer?.sublist(2);
     }
