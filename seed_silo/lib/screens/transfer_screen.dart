@@ -19,7 +19,7 @@ class _TransferScreenState extends State<TransferScreen> {
   final TextEditingController _destinationController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _passwordPosController = TextEditingController();
+  final TextEditingController _passwordPosController = TextEditingController(text: '1');
 
   bool _isLoading = false;
 

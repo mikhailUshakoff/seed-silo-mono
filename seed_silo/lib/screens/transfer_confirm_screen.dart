@@ -23,7 +23,7 @@ class TransferConfirmScreen extends StatefulWidget {
 class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _passwordPosController = TextEditingController();
+  final TextEditingController _passwordPosController = TextEditingController(text: '1');
 
   String? _txHash;
   bool _isSubmitting = false;

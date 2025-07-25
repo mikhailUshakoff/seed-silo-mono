@@ -53,6 +53,7 @@ class _MainScreenState extends State<MainScreen> {
             icon: const Icon(Icons.settings),
             onPressed: _navigateToManageTokens,
           ),
+          SizedBox(width: 58),
         ],
       ),
       body: ListView.builder(
