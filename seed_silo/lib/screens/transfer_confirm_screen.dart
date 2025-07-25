@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:seed_silo/services/eth_wallet_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:web3dart/web3dart.dart';
 
 class TransferConfirmScreen extends StatefulWidget {
   final Token token;
@@ -23,17 +24,38 @@ class TransferConfirmScreen extends StatefulWidget {
 class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _passwordPosController = TextEditingController(text: '1');
+  final TextEditingController _passwordPosController =
+      TextEditingController(text: '1');
 
   String? _txHash;
   bool _isSubmitting = false;
   bool _isBalanceLoading = true;
   BigInt? _balance;
+  bool _isTransactionLoading = true;
+  Transaction? _transaction;
+  BigInt? _chainId;
 
   @override
   void initState() {
     super.initState();
     _loadBalance();
+    _buildTransaction();
+  }
+
+  Future<void> _buildTransaction() async {
+    final (chainId, tx) = await EthWalletService().buildTransaction(
+      EthWalletService().walletAddress,
+      widget.token.address,
+      widget.destination,
+      widget.amount,
+    );
+    if (mounted) {
+      setState(() {
+        _transaction = tx;
+        _chainId = chainId;
+        _isTransactionLoading = false;
+      });
+    }
   }
 
   Future<void> _loadBalance() async {
@@ -106,8 +128,44 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
             else
               Text('Balance: ${_balance.toString()}'),
             Text('Token: ${widget.token.symbol}'),
-            Text('Destination: ${widget.destination}'),
-            Text('Amount: ${widget.amount}'),
+            const SizedBox(height: 16),
+            if (_isTransactionLoading)
+              const Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Building transaction...'),
+                ],
+              )
+            else if (_transaction != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Transaction Details:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text('Chain ID: ${_chainId?.toString() ?? "null"}'),
+                  Text('To: ${_transaction!.to?.hex ?? "null"}'),
+                  Text('From: ${_transaction!.from?.hex ?? "null"}'),
+                  Text('Nonce: ${_transaction!.nonce?.toString() ?? "null"}'),
+                  Text('Gas: ${_transaction!.maxGas?.toString() ?? "null"}'),
+                  Text(
+                      'Gas Price: ${_transaction!.gasPrice?.getInWei.toString() ?? "null"}'),
+                  Text(
+                      'Max Fee Per Gas: ${_transaction!.maxFeePerGas?.getInWei.toString() ?? "null"}'),
+                  Text(
+                      'Max Priority Fee Per Gas: ${_transaction!.maxPriorityFeePerGas?.getInWei.toString() ?? "null"}'),
+                  Text(
+                      'Value (in wei): ${_transaction!.value?.getInWei.toString() ?? "null"}'),
+                  Text(
+                      'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
+                  //Text('Decoded Data:\n${_transaction!.data != null ? EthWalletService().decodeTransactionData(_transaction!.data) : "null"}'),
+                ],
+              ),
             const SizedBox(height: 16),
             Form(
               key: _formKey,
@@ -124,7 +182,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                   ),
                   TextFormField(
                     controller: _passwordPosController,
-                    decoration: const InputDecoration(labelText: 'Password Pos'),
+                    decoration:
+                        const InputDecoration(labelText: 'Password Pos'),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     enabled: _txHash == null,
@@ -139,7 +198,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
             if (_txHash == null) ...[
               SubmitSlider(
                 onSubmit: _submitTransaction,
-                enabled: !_isBalanceLoading,
+                enabled: !_isBalanceLoading && !_isTransactionLoading,
               ),
             ] else ...[
               const Text('Transaction submitted!',

@@ -16,7 +16,8 @@ class TransferScreen extends StatefulWidget {
 
 class _TransferScreenState extends State<TransferScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _destinationController = TextEditingController();
+  // TODO remove test value
+  final TextEditingController _destinationController = TextEditingController(text: '0x97eD1e9f671A7ED3a6173e7D743936Bb9CB2e188');
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordPosController = TextEditingController(text: '1');

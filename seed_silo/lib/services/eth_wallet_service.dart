@@ -24,7 +24,8 @@ class EthWalletService {
       [
         {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
         {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},
-        {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"}
+        {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},
+        {"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
       ]
     ''';
 
@@ -46,6 +47,26 @@ class EthWalletService {
     return '0x${hex.encode(addressBytes)}';
   }
 
+  String? decodeTransactionData(Uint8List? data) {
+    if (data == null || data.isEmpty) return null;
+
+    final contract = DeployedContract(
+      ContractAbi.fromJson(erc20Abi, 'ERC20'),
+      EthereumAddress.fromHex('0x0'), // dummy address, not used for decoding
+    );
+
+    final paramData = data.sublist(4); // skip selector
+    final decoded = TupleType([
+      AddressType(),
+      UintType(length: 256),
+    ]).decode(paramData.buffer, 0);
+
+    final to = decoded.data[0] as EthereumAddress;
+    final value = decoded.data[1] as BigInt;
+
+    return 'Function: transfer\nTo: ${to.hex}\nAmount (wei): $value';
+  }
+
   Future<String?> updateAddress(Uint8List textPassword) async {
     final password = keccak256(textPassword);
     nullify(textPassword);
@@ -65,9 +86,8 @@ class EthWalletService {
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(_walletAddress!);
     if (token == _ethAddress) {
-      final balance =
-          await ethClient.getBalance(walletAddress);
-      return balance as BigInt;
+      final balance = await ethClient.getBalance(walletAddress);
+      return balance.getInWei;
     } else {
       //ERC20 get balance
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(token);
@@ -92,36 +112,77 @@ class EthWalletService {
     }
   }
 
-  Future<void> buildTransaction(
-      String from, String token, String dst, String amount) async {
+  Future<(BigInt, Transaction)> buildTransaction(
+    String from,
+    String token,
+    String dst,
+    String amount,
+  ) async {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
-    if (token == _ethAddress) {
-      final dstAddress = EthereumAddress.fromHex(dst);
-      final sender = EthereumAddress.fromHex(from);
-      int nonce = await ethClient.getTransactionCount(sender);
+    final sender = EthereumAddress.fromHex(from);
+    print('sender: $sender');
+    final dstAddress = EthereumAddress.fromHex(dst);
+    final isEth = token.toLowerCase() == _ethAddress.toLowerCase();
+    final nonce = await ethClient.getTransactionCount(sender);
+    final chainId = await ethClient.getChainId();
 
-      final chainId = await ethClient.getChainId();
+    final maxPriorityFeePerGas = EtherAmount.inWei(BigInt.from(1e9)); // 1 Gwei
+    final baseFeePerGas = await ethClient.getGasPrice();
+    final maxFeePerGas = EtherAmount.inWei(
+      baseFeePerGas.getInWei * BigInt.from(2) + BigInt.from(1e9),
+    );
 
-      final maxPriorityFeePerGas = EtherAmount.inWei(BigInt.from(1000000000));
-      EtherAmount baseFeePerGas = await ethClient.getGasPrice();
-      EtherAmount maxFeePerGas = EtherAmount.inWei(
-          baseFeePerGas.getInWei * BigInt.from(2) + BigInt.from(1000000000));
-
+    if (isEth) {
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
-      // Create an unsigned transaction
-      final transaction = Transaction(
-        to: dstAddress,
-        value: value,
-        maxGas: 21000, // Standard ETH transfer gas limit
-        nonce: nonce,
-        maxFeePerGas: maxFeePerGas, // Fetched max fee
-        maxPriorityFeePerGas: maxPriorityFeePerGas, // Fetched priority fee
-        data: Uint8List.fromList([]),
+
+      return (
+        chainId,
+        Transaction(
+          to: dstAddress,
+          value: value,
+          maxGas: 21000,
+          nonce: nonce,
+          maxFeePerGas: maxFeePerGas,
+          maxPriorityFeePerGas: maxPriorityFeePerGas,
+        )
       );
-      final rawTransaction =
-          transaction.getUnsignedSerialized(chainId: chainId.toInt());
+    } else {
+      // Build ERC-20 token transfer
+      final tokenAddress = EthereumAddress.fromHex(token);
+
+      final contract = DeployedContract(
+        ContractAbi.fromJson(erc20Abi, 'ERC20'),
+        tokenAddress,
+      );
+
+      final transferFunction = contract.function('transfer');
+
+      final amountInt = BigInt.parse(amount); // Already in wei
+      final data = transferFunction.encodeCall([dstAddress, amountInt]);
+
+      final gasLimit = await ethClient.estimateGas(
+        sender: sender,
+        to: tokenAddress,
+        value: EtherAmount.zero(),
+        data: data,
+      );
+
+      final adjustedGas = (gasLimit.toDouble() * 1.2).ceil();
+
+      return (
+        chainId,
+        Transaction(
+          to: tokenAddress,
+          value: EtherAmount.zero(),
+          data: data,
+          maxGas: adjustedGas,
+          nonce: nonce,
+          maxFeePerGas: maxFeePerGas,
+          maxPriorityFeePerGas: maxPriorityFeePerGas,
+        )
+      );
     }
   }
 
@@ -147,8 +208,9 @@ class EthWalletService {
 
   Future<void> addToken(String address) async {
     // Check if already added
-    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase()))
+    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
       return;
+    }
 
     // Fetch token info (symbol, decimals) from blockchain
     final tokenInfo = await _fetchTokenInfo(address);
@@ -176,15 +238,8 @@ class EthWalletService {
 
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
 
-      const String abi = '''
-      [
-        {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
-        {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"}
-      ]
-    ''';
-
       final DeployedContract contract = DeployedContract(
-        ContractAbi.fromJson(abi, 'ERC20'),
+        ContractAbi.fromJson(erc20Abi, 'ERC20'),
         tokenAddress,
       );
 

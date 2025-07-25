@@ -21,7 +21,7 @@ class _SubmitSliderState extends State<SubmitSlider> {
   @override
   Widget build(BuildContext context) {
     return SlideAction(
-      text: widget.enabled ? widget.label : 'Loading balance...',
+      text: widget.enabled ? widget.label : 'Loading data. Please wait...',
       enabled: widget.enabled,
       outerColor: Theme.of(context).colorScheme.primary,
       innerColor: widget.enabled ? Theme.of(context).colorScheme.surface : Theme.of(context).colorScheme.primary,
