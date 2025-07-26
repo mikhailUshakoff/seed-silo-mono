@@ -10,6 +10,17 @@ import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
+
+/// rewardPercentileIndex is an integer that represents which percentile of priority fees
+/// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
+/// are determined by percentile ranges. The available values are:
+/// low - 25th percentile
+/// medium - 50th percentile
+/// high - 75th percentile
+/// These indices are used to select the corresponding priority fee from the list of fees
+/// returned by the getGasInEIP1559 function.
+enum RewardPercentile { low, medium, high }
+
 class EthWalletService {
   static final EthWalletService _instance = EthWalletService._internal();
   factory EthWalletService() => _instance;
@@ -30,6 +41,8 @@ class EthWalletService {
     ''';
 
   List<Token> _tokens = [];
+
+  bool isEthToken(String token) => token == _ethAddress;
 
   String getEthereumAddressFromPublicKey(Uint8List publicKey) {
     Uint8List hashedKey = keccak256(publicKey);
@@ -144,7 +157,7 @@ class EthWalletService {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(wallet);
-    if (token == _ethAddress) {
+    if (isEthToken(token)) {
       final balance = await ethClient.getBalance(walletAddress);
       return balance.getInWei;
     } else {
@@ -168,30 +181,35 @@ class EthWalletService {
     }
   }
 
+
+
   Future<(BigInt, Transaction)?> buildEip1559Transaction(
     String from,
     String token,
     String dst,
     String amount,
+    {RewardPercentile rewardPercentile = RewardPercentile.low,}
   ) async {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
     final sender = EthereumAddress.fromHex(from);
     final dstAddress = EthereumAddress.fromHex(dst);
-    final isEth = token.toLowerCase() == _ethAddress.toLowerCase();
     final nonce = await ethClient.getTransactionCount(sender);
     final chainId = await ethClient.getChainId();
 
-    final maxPriorityFeePerGas = EtherAmount.inWei(BigInt.from(1e9)); // 1 Gwei
-    final baseFeePerGas = await ethClient.getGasPrice();
-    final maxFeePerGas = EtherAmount.inWei(
-      baseFeePerGas.getInWei * BigInt.from(2) + BigInt.from(1e9),
-    );
+    final gasInEIP1559 = await ethClient.getGasInEIP1559();
+    if (gasInEIP1559.length != 3) {
+      return null;
+    }
+    final maxPriorityFeePerGas =
+        EtherAmount.inWei(gasInEIP1559[rewardPercentile.index].maxPriorityFeePerGas);
+    final maxFeePerGas =
+        EtherAmount.inWei(gasInEIP1559[rewardPercentile.index].maxFeePerGas);
 
-    if (isEth) {
+    if (isEthToken(token)) {
+      // Build ETH transfer
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
-
       return (
         chainId,
         Transaction(
@@ -199,22 +217,20 @@ class EthWalletService {
           value: value,
           maxGas: 21000, // Standard ETH transfer gas limit
           nonce: nonce,
-          maxFeePerGas: maxFeePerGas, // Fetched max fee
-          maxPriorityFeePerGas: maxPriorityFeePerGas, // Fetched priority fee
+          maxFeePerGas: maxFeePerGas,
+          maxPriorityFeePerGas: maxPriorityFeePerGas,
           data: Uint8List.fromList([]),
         )
       );
     } else {
       // Build ERC-20 token transfer
       final tokenAddress = EthereumAddress.fromHex(token);
-
       final contract = DeployedContract(
         ContractAbi.fromJson(erc20Abi, 'ERC20'),
         tokenAddress,
       );
 
       final transferFunction = contract.function('transfer');
-
       final amountInt = BigInt.parse(amount); // Already in wei
       final data = transferFunction.encodeCall([dstAddress, amountInt]);
 
