@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:seed_silo/screens/transfer_confirm_screen.dart';
 import 'package:seed_silo/widgets/formatted_amount_field.dart';
 
 class TransferScreen extends StatefulWidget {
@@ -16,24 +16,30 @@ class _TransferScreenState extends State<TransferScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _destinationController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _passwordPosController = TextEditingController();
+
 
   @override
   void dispose() {
     _destinationController.dispose();
     _amountController.dispose();
-    _passwordController.dispose();
-    _passwordPosController.dispose();
     super.dispose();
   }
 
-  void _onTransferPressed() {
+  void _onTransferPressed() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // TODO: Implement transfer logic here
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Transfer placeholder: Implement logic')),
+    final destination = _destinationController.text.trim();
+    final amount = _amountController.text.replaceAll(' ', '');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TransferConfirmScreen(
+          token: widget.token,
+          destination: destination,
+          amount: amount,
+        ),
+      ),
     );
   }
 
@@ -65,31 +71,16 @@ class _TransferScreenState extends State<TransferScreen> {
                 label: 'Amount',
                 decimals: widget.token.decimals,
                 validator: (value) {
-                  if (value == null || value.isEmpty)
+                  if (value == null || value.isEmpty) {
                     return 'Please enter amount';
+                  }
                   final clean = value.replaceAll(' ', '');
                   final amount = double.tryParse(clean);
-                  if (amount == null || amount <= 0)
+                  if (amount == null || amount <= 0) {
                     return 'Enter valid amount';
+                  }
                   return null;
                 },
-              ),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Please enter password'
-                    : null,
-              ),
-              TextFormField(
-                controller: _passwordPosController,
-                decoration: const InputDecoration(labelText: 'Password Pos'),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Please enter password position'
-                    : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton(

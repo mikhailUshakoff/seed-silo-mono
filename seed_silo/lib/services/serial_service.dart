@@ -41,7 +41,13 @@ class SerialService {
       final ok = await connect();
       if (!ok) return null;
     }
-    return _port!.write(Uint8List.fromList(data));
+
+    try {
+      return _port!.write(Uint8List.fromList(data));
+    } catch (e) {
+      _port?.close();
+      return null;
+    }
   }
 
   Future<Uint8List?> read(int length) async {
