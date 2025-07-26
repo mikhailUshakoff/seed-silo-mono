@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:convert/convert.dart';
+import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,16 +30,6 @@ class EthWalletService {
     ''';
 
   List<Token> _tokens = [];
-  Uint8List? _publicKey;
-  String? _walletAddress;
-
-  // get wallet address
-  String get walletAddress {
-    if (_walletAddress == null) {
-      throw Exception('Wallet address has not been set');
-    }
-    return _walletAddress!;
-  }
 
   String getEthereumAddressFromPublicKey(Uint8List publicKey) {
     Uint8List hashedKey = keccak256(publicKey);
@@ -47,13 +37,55 @@ class EthWalletService {
     return '0x${hex.encode(addressBytes)}';
   }
 
+  List<dynamic> _encodeEIP1559ToRlp(
+    Transaction transaction,
+    MsgSignature? signature,
+    int chainId,
+  ) {
+    final list = [
+      chainId,
+      transaction.nonce,
+      transaction.maxPriorityFeePerGas!.getInWei,
+      transaction.maxFeePerGas!.getInWei,
+      transaction.maxGas,
+    ];
+
+    if (transaction.to != null) {
+      list.add(transaction.to!.addressBytes);
+    } else {
+      list.add('');
+    }
+
+    list
+      ..add(transaction.value?.getInWei)
+      ..add(transaction.data);
+
+    list.add([]); // access list
+
+    if (signature != null) {
+      list
+        ..add(signature.v)
+        ..add(signature.r)
+        ..add(signature.s);
+    }
+
+    return list;
+  }
+
   String? decodeTransactionData(Uint8List? data) {
     if (data == null || data.isEmpty) return null;
 
     final contract = DeployedContract(
       ContractAbi.fromJson(erc20Abi, 'ERC20'),
-      EthereumAddress.fromHex('0x0'), // dummy address, not used for decoding
+      EthereumAddress.fromHex(
+          _ethAddress), // dummy address, not used for decoding
     );
+
+    final function = contract.function('transfer');
+    final selector = data.sublist(0, 4);
+    final functionName = !listEquals(function.selector, selector)
+        ? bytesToHex(data.sublist(0, 4), include0x: true)
+        : "transfer (0xa9059cbb)";
 
     final paramData = data.sublist(4); // skip selector
     final decoded = TupleType([
@@ -64,27 +96,54 @@ class EthWalletService {
     final to = decoded.data[0] as EthereumAddress;
     final value = decoded.data[1] as BigInt;
 
-    return 'Function: transfer\nTo: ${to.hex}\nAmount (wei): $value';
+    return '    Function: $functionName\n    To: ${to.hex}\n    Amount (wei): $value';
   }
 
-  Future<String?> updateAddress(Uint8List textPassword) async {
-    final password = keccak256(textPassword);
-    nullify(textPassword);
-    _publicKey =
-        await HardwareWalletService().getUncompressedPublicKey(password);
-    if (_publicKey == null) {
-      _walletAddress = null;
-    } else {
-      _walletAddress = getEthereumAddressFromPublicKey(_publicKey!);
+  Future<String?> sendTransaction(
+      Uint8List textPassword, Transaction tx, int chainId) async {
+    if (!tx.isEIP1559) {
+      nullifyUint8List(textPassword);
+      return null;
     }
-    return _walletAddress;
+
+    final password = keccak256(textPassword);
+    nullifyUint8List(textPassword);
+
+    final rawTransaction = tx.getUnsignedSerialized(chainId: chainId);
+
+    final sig =
+        await HardwareWalletService().getSignature(password, rawTransaction);
+    if (sig == null) {
+      return null;
+    }
+
+    final signedTransaction = _encodeEIP1559ToRlp(tx, sig, chainId);
+    final signedRlp = encode(signedTransaction); //rlp
+    Uint8List tx2Send = Uint8List.fromList(signedRlp);
+    // tx is EIP1559 add prefix 0x02
+    tx2Send = prependTransactionType(0x02, tx2Send);
+
+    final Web3Client client = Web3Client(rpcUrl, Client());
+    String sendTxHash = await client.sendRawTransaction(tx2Send);
+
+    return sendTxHash;
   }
 
-  Future<BigInt> getBalance(String token) async {
-    if (_walletAddress == null) return BigInt.from(0);
+  Future<String?> getAddress(Uint8List textPassword) async {
+    final password = keccak256(textPassword);
+    nullifyUint8List(textPassword);
+    final publicKey =
+        await HardwareWalletService().getUncompressedPublicKey(password);
+
+    return publicKey == null
+        ? null
+        : getEthereumAddressFromPublicKey(publicKey);
+  }
+
+  Future<BigInt> getBalance(String wallet, String token) async {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
-    final walletAddress = EthereumAddress.fromHex(_walletAddress!);
+    final walletAddress = EthereumAddress.fromHex(wallet);
     if (token == _ethAddress) {
       final balance = await ethClient.getBalance(walletAddress);
       return balance.getInWei;
@@ -105,14 +164,11 @@ class EthWalletService {
         params: [walletAddress],
       );
 
-      // TODO remove
-      await Future.delayed(const Duration(seconds: 5));
-
       return balance.first as BigInt;
     }
   }
 
-  Future<(BigInt, Transaction)> buildTransaction(
+  Future<(BigInt, Transaction)?> buildEip1559Transaction(
     String from,
     String token,
     String dst,
@@ -122,7 +178,6 @@ class EthWalletService {
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
     final sender = EthereumAddress.fromHex(from);
-    print('sender: $sender');
     final dstAddress = EthereumAddress.fromHex(dst);
     final isEth = token.toLowerCase() == _ethAddress.toLowerCase();
     final nonce = await ethClient.getTransactionCount(sender);
@@ -142,10 +197,11 @@ class EthWalletService {
         Transaction(
           to: dstAddress,
           value: value,
-          maxGas: 21000,
+          maxGas: 21000, // Standard ETH transfer gas limit
           nonce: nonce,
-          maxFeePerGas: maxFeePerGas,
-          maxPriorityFeePerGas: maxPriorityFeePerGas,
+          maxFeePerGas: maxFeePerGas, // Fetched max fee
+          maxPriorityFeePerGas: maxPriorityFeePerGas, // Fetched priority fee
+          data: Uint8List.fromList([]),
         )
       );
     } else {
@@ -162,27 +218,31 @@ class EthWalletService {
       final amountInt = BigInt.parse(amount); // Already in wei
       final data = transferFunction.encodeCall([dstAddress, amountInt]);
 
-      final gasLimit = await ethClient.estimateGas(
-        sender: sender,
-        to: tokenAddress,
-        value: EtherAmount.zero(),
-        data: data,
-      );
-
-      final adjustedGas = (gasLimit.toDouble() * 1.2).ceil();
-
-      return (
-        chainId,
-        Transaction(
+      try {
+        final gasLimit = await ethClient.estimateGas(
+          sender: sender,
           to: tokenAddress,
           value: EtherAmount.zero(),
           data: data,
-          maxGas: adjustedGas,
-          nonce: nonce,
-          maxFeePerGas: maxFeePerGas,
-          maxPriorityFeePerGas: maxPriorityFeePerGas,
-        )
-      );
+        );
+
+        final adjustedGas = (gasLimit.toDouble() * 1.2).ceil();
+
+        return (
+          chainId,
+          Transaction(
+            to: tokenAddress,
+            value: EtherAmount.zero(),
+            data: data,
+            maxGas: adjustedGas,
+            nonce: nonce,
+            maxFeePerGas: maxFeePerGas,
+            maxPriorityFeePerGas: maxPriorityFeePerGas,
+          )
+        );
+      } catch (e) {
+        return null;
+      }
     }
   }
 

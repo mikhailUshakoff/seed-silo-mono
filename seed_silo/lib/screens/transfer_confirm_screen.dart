@@ -29,43 +29,14 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
   String? _txHash;
   bool _isSubmitting = false;
-  bool _isBalanceLoading = true;
-  BigInt? _balance;
-  bool _isTransactionLoading = true;
   Transaction? _transaction;
   BigInt? _chainId;
+  bool _showTxInfo = false;
+  String? _walletAddress;
 
   @override
   void initState() {
     super.initState();
-    _loadBalance();
-    _buildTransaction();
-  }
-
-  Future<void> _buildTransaction() async {
-    final (chainId, tx) = await EthWalletService().buildTransaction(
-      EthWalletService().walletAddress,
-      widget.token.address,
-      widget.destination,
-      widget.amount,
-    );
-    if (mounted) {
-      setState(() {
-        _transaction = tx;
-        _chainId = chainId;
-        _isTransactionLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadBalance() async {
-    final balance = await EthWalletService().getBalance(widget.token.address);
-    if (mounted) {
-      setState(() {
-        _balance = balance;
-        _isBalanceLoading = false;
-      });
-    }
   }
 
   @override
@@ -79,19 +50,58 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
-    _passwordController.text = '';
-
     setState(() => _isSubmitting = true);
 
-    await Future.delayed(
-        const Duration(seconds: 5)); // Simulate signing and sending
+    final walletAddress = await EthWalletService()
+        .getAddress(Uint8List.fromList(_passwordController.text.codeUnits));
 
-    // TODO: Replace with actual sign/send logic
-    const fakeHash = '0xabc123aaadeadbeef';
+    if (walletAddress == null) {
+      _passwordController.text = '';
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Can not receive wallet address')),
+      );
+
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    _walletAddress = walletAddress;
+
+    final bTx = await EthWalletService().buildEip1559Transaction(
+      walletAddress,
+      widget.token.address,
+      widget.destination,
+      widget.amount,
+    );
+
+    if (bTx == null) {
+      _passwordController.text = '';
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Can not build transaction')),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    if (!mounted) return;
+    _chainId = bTx.$1;
+    _transaction = bTx.$2;
+    setState(() {
+      _showTxInfo = true;
+    });
+
+    final sendResult = await EthWalletService().sendTransaction(
+      Uint8List.fromList(_passwordController.text.codeUnits),
+      _transaction!,
+      _chainId!.toInt(),
+    );
+    _passwordController.text = '';
+    String txHash = sendResult ?? "0x";
 
     setState(() {
-      _txHash = fakeHash;
-      _isSubmitting = false;
+      _txHash = txHash;
     });
   }
 
@@ -112,60 +122,50 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            Text('Wallet address: ${EthWalletService().walletAddress}'),
-            if (_isBalanceLoading)
-              const Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 12),
-                  Text('Loading balance...'),
-                ],
-              )
-            else
-              Text('Balance: ${_balance.toString()}'),
-            Text('Token: ${widget.token.symbol}'),
+            Text(
+              'Token: ${widget.token.symbol} decimals: ${widget.token.decimals}',
+            ),
+            Text(
+              'Destination: ${widget.destination}',
+            ),
+            Text(
+              'Amount: ${widget.amount}',
+            ),
             const SizedBox(height: 16),
-            if (_isTransactionLoading)
-              const Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  SizedBox(width: 12),
-                  Text('Building transaction...'),
-                ],
-              )
-            else if (_transaction != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Transaction Details:',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Chain ID: ${_chainId?.toString() ?? "null"}'),
-                  Text('To: ${_transaction!.to?.hex ?? "null"}'),
-                  Text('From: ${_transaction!.from?.hex ?? "null"}'),
-                  Text('Nonce: ${_transaction!.nonce?.toString() ?? "null"}'),
-                  Text('Gas: ${_transaction!.maxGas?.toString() ?? "null"}'),
-                  Text(
-                      'Gas Price: ${_transaction!.gasPrice?.getInWei.toString() ?? "null"}'),
-                  Text(
-                      'Max Fee Per Gas: ${_transaction!.maxFeePerGas?.getInWei.toString() ?? "null"}'),
-                  Text(
-                      'Max Priority Fee Per Gas: ${_transaction!.maxPriorityFeePerGas?.getInWei.toString() ?? "null"}'),
-                  Text(
-                      'Value (in wei): ${_transaction!.value?.getInWei.toString() ?? "null"}'),
-                  Text(
-                      'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
-                  //Text('Decoded Data:\n${_transaction!.data != null ? EthWalletService().decodeTransactionData(_transaction!.data) : "null"}'),
-                ],
-              ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: _showTxInfo
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Wallet address: $_walletAddress'),
+                        const Text('Transaction Details:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text('Chain ID: ${_chainId?.toString() ?? "null"}'),
+                        Text('To: ${_transaction!.to?.hex ?? "null"}'),
+                        Text('From: ${_transaction!.from?.hex ?? "null"}'),
+                        Text(
+                            'Nonce: ${_transaction!.nonce?.toString() ?? "null"}'),
+                        Text(
+                            'Gas: ${_transaction!.maxGas?.toString() ?? "null"}'),
+                        Text(
+                            'Gas Price: ${_transaction!.gasPrice?.getInWei.toString() ?? "null"}'),
+                        Text(
+                            'Max Fee Per Gas: ${_transaction!.maxFeePerGas?.getInWei.toString() ?? "null"}'),
+                        Text(
+                            'Max Priority Fee Per Gas: ${_transaction!.maxPriorityFeePerGas?.getInWei.toString() ?? "null"}'),
+                        Text(
+                            'Value (in wei): ${_transaction!.value?.getInWei.toString() ?? "null"}'),
+                        Text(
+                            'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
+                        Text(
+                            'Decoded Data:\n${_transaction!.data != null ? EthWalletService().decodeTransactionData(_transaction!.data) : "null"}'),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
             const SizedBox(height: 16),
             Form(
               key: _formKey,
@@ -175,7 +175,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                     controller: _passwordController,
                     decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
-                    enabled: _txHash == null,
+                    enabled: _txHash == null && _isSubmitting == false,
                     validator: (value) => value == null || value.isEmpty
                         ? 'Please enter password'
                         : null,
@@ -186,7 +186,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         const InputDecoration(labelText: 'Password Pos'),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    enabled: _txHash == null,
+                    enabled: _txHash == null && _isSubmitting == false,
                     validator: (value) => value == null || value.isEmpty
                         ? 'Please enter password position'
                         : null,
@@ -198,11 +198,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
             if (_txHash == null) ...[
               SubmitSlider(
                 onSubmit: _submitTransaction,
-                enabled: !_isBalanceLoading && !_isTransactionLoading,
               ),
             ] else ...[
-              const Text('Transaction submitted!',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               SelectableText('Hash: $_txHash'),
               const SizedBox(height: 8),

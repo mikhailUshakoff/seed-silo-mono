@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 
-void nullify(Uint8List list) {
-    for (int i = 0; i < list.length; i++) {
-      list[i] = 0;
-    }
+void nullifyUint8List(Uint8List list) {
+  list.fillRange(0, list.length, 0);
+}
+
+void nullifyListInt(List<int> list) {
+  list.fillRange(0, list.length, 0);
+  list.clear();
 }

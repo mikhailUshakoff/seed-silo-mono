@@ -35,14 +35,15 @@ class HardwareWalletService {
     return bytes.buffer.asUint8List();
   }
 
-  Future<MsgSignature?> getSignature(String password, Uint8List rawTransaction) async {
-    final keccakHash = keccak256(Uint8List.fromList(password.codeUnits));
+  Future<MsgSignature?> getSignature(Uint8List password, Uint8List rawTransaction) async {
     final request = [getSignatureCmd];
-    request.addAll(keccakHash);
+    request.addAll(password);
+    nullifyUint8List(password);
     request.addAll(intTo2Bytes(rawTransaction.length));
     request.addAll(rawTransaction);
 
     final ok = await SerialService().write(request);
+    nullifyListInt(request);
     if (ok == null) return null;
 
     await Future.delayed(Duration(seconds: 2));
@@ -69,8 +70,9 @@ class HardwareWalletService {
   Future<Uint8List?> getUncompressedPublicKey(Uint8List password) async {
     final request = [getUncompressedPublicKeyCmd];
     request.addAll(password);
+    nullifyUint8List(password);
     final ok = await SerialService().write(request);
-    nullify(password);
+    nullifyListInt(request);
     if (ok == null) return null;
 
     await Future.delayed(Duration(seconds: 2));
@@ -85,6 +87,5 @@ class HardwareWalletService {
 
   void dispose() {
     SerialService().close();
-    print('Cleaning up HardwareWalletService');
   }
 }
