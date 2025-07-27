@@ -18,10 +18,10 @@ class HardwareWalletService {
     final ok = await SerialService().write([getVersionCmd]);
     if (ok == null) return null;
 
-    await Future.delayed(Duration(seconds: 1));
+    await Future.delayed(Duration(seconds: 3));
 
     final buffer = await SerialService().read(1);
-    if (buffer?[0] == 0xF0) {
+    if (buffer?.length == 1 && buffer?[0] == 0xF0) {
       return 1;
     }
 
@@ -50,7 +50,7 @@ class HardwareWalletService {
 
     final buffer = await SerialService().read(66);
 
-    if (buffer == null || buffer[0] != 0xF0) {
+    if (buffer == null || buffer.length != 66 || buffer[0] != 0xF0) {
       return null;
     }
 
@@ -78,7 +78,7 @@ class HardwareWalletService {
     await Future.delayed(Duration(seconds: 2));
 
     final buffer = await SerialService().read(66);
-    if (buffer?[0] == 0xF0) {
+    if ( buffer?.length == 66 || buffer?[0] == 0xF0) {
       return buffer?.sublist(2);
     }
 
