@@ -1,7 +1,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-    #define CMD_CHECK_STATUS 0x01
+    #define CMD_GET_VERSION 0x01
     #define CMD_GET_PUBKEY 0x02
     #define CMD_SIGN 0x03
 
