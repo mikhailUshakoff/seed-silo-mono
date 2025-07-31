@@ -46,11 +46,13 @@ class HardwareWalletService {
     nullifyListInt(request);
     if (ok == null) return null;
 
-    await Future.delayed(Duration(seconds: 2));
+    Uint8List? buffer;
+    while (buffer == null || buffer.isEmpty) {
+      await Future.delayed(Duration(seconds: 2));
+      buffer = await SerialService().read(66);
+    }
 
-    final buffer = await SerialService().read(66);
-
-    if (buffer == null || buffer.length != 66 || buffer[0] != 0xF0) {
+    if (buffer.length != 66 || buffer[0] != 0xF0) {
       return null;
     }
 

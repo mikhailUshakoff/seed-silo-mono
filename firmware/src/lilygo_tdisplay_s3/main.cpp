@@ -16,62 +16,8 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 #define up 14
 
 bool bSignConfirmationScreen = false;
-
-int sign_cmd_get_msg_signature123(
-    uint8_t* out_signature,
-    uint8_t* out_rec_id,
-    uint8_t* out_message,
-    uint16_t* out_msg_len
-) {
-    uint8_t key[32];
-    if (Serial.readBytes(key, sizeof(key)) != sizeof(key)) {
-        error_response(ERROR_WRONG_DATA_FORMAT);
-        return STATUS_ERR;
-    }
-
-    uint8_t private_key[32];
-    decrypt_private_key(key, private_key);
-    secure_memzero(key, sizeof(key));
-
-    uint8_t len_bytes[2];
-    if (Serial.readBytes(len_bytes, 2) != 2) {
-        secure_memzero(private_key, sizeof(private_key));
-        error_response(ERROR_WRONG_DATA_FORMAT);
-        return STATUS_ERR;
-    }
-
-    *out_msg_len = (len_bytes[0] << 8) | len_bytes[1];
-    if (*out_msg_len == 0 || *out_msg_len > MAX_MSG_LEN) {
-        error_response(ERROR_WRONG_DATA_FORMAT);
-        secure_memzero(private_key, sizeof(private_key));
-        return STATUS_ERR;
-    }
-
-    if (Serial.readBytes(out_message, *out_msg_len) != *out_msg_len) {
-        error_response(ERROR_WRONG_DATA_FORMAT);
-        secure_memzero(private_key, sizeof(private_key));
-        return STATUS_ERR;
-    }
-
-    uint8_t hash[32] = {0};
-    size_t len = *out_msg_len;
-    keccak256(out_message, len, hash);
-    tft.println(*out_msg_len);
-
-    int success = sign(private_key, hash, out_signature, out_rec_id);
-    tft.println(*out_msg_len);
-    tft.println(len);
-    secure_memzero(private_key, sizeof(private_key));
-    tft.println(*out_msg_len);
-    if (!success) {
-        error_response(RESPONSE_FAIL);
-        return STATUS_ERR;
-    }
-
-    tft.println(*out_msg_len);
-
-    return STATUS_OK;
-}
+uint8_t signature[64] = {0};
+int rec_id = 0;
 
 void tft_drawString(const char* str, int x, int y) {
     // For demo, just print with coordinates
@@ -147,15 +93,32 @@ void print_hex_tft(const char *label, const uint8_t *data, size_t len, int x, in
     tft.drawString(buf, x, y);
 }
 
+void print_hex_tft_trim_leading_zeros(const char *label, const uint8_t *data, size_t len, int x, int y) {
+    char buf[256] = {0};
+    int written = snprintf(buf, sizeof(buf), "%s: 0x", label);
+
+    size_t start = 0;
+    while (start < len && data[start] == 0) {
+        start++;
+    }
+
+    for (size_t i = start; i < len && written < (int)(sizeof(buf) - 3); i++) {
+        written += snprintf(buf + written, sizeof(buf) - written, "%02x", data[i]);
+    }
+
+    if (start == len) {
+        written += snprintf(buf + written, sizeof(buf) - written, "0");
+    }
+
+    tft.drawString(buf, x, y);
+}
+
 // Main parser: parse EIP-1559 type-2 tx and print all fields
-void parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
+int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
     if (len < 2 || tx[0] != 0x02) {
         tft.drawString("Not a type-2 tx", 10, 15);
         print_hex_tft("tx", tx, len, 10, 30);
-        char buf[10] = {0};
-        snprintf(buf, sizeof(buf), "%02x", tx[0]);
-        tft.drawString(buf, 10, 40);
-        return;
+        return STATUS_ERR;
     }
 
     const uint8_t *rlp = tx + 1;
@@ -164,12 +127,12 @@ void parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
     size_t list_len = 0, list_offset = 0;
     if (rlp_read_length(rlp, rlp_len, &list_len, &list_offset) != 0) {
         tft.drawString("RLP list parse fail", 10, 15);
-        return;
+        return STATUS_ERR;
     }
 
     if (list_offset + list_len > rlp_len) {
         tft.drawString("RLP list length invalid", 10, 15);
-        return;
+        return STATUS_ERR;
     }
 
     const uint8_t *p = rlp + list_offset;
@@ -177,8 +140,7 @@ void parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
 
     const char *fields[] = {
         "chain_id", "nonce", "max_priority_fee_per_gas", "max_fee_per_gas",
-        "gas_limit", "to", "value", "data", "access_list",
-        "v", "r", "s"
+        "gas_limit", "to", "value", "data"
     };
     int num_fields = sizeof(fields) / sizeof(fields[0]);
 
@@ -191,12 +153,24 @@ void parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
         const uint8_t *field = rlp_read_item(p, remaining, &field_len, &consumed);
         if (!field) {
             tft.drawString("RLP field parse fail", x, y);
-            return;
+            return STATUS_ERR;
         }
 
-        if (i == 8) {
-            // access_list is complex; skip decoding here
-            tft.drawString("access_list: <skipped>", x, y);
+        if (i == 7 && field_len > 0) {
+            if (field_len != 4 + 32 + 32 || memcmp(field, "\xa9\x05\x9c\xbb", 4) != 0) {
+                tft.drawString("Not EIP-20 transfer", x, y);
+                return STATUS_ERR;
+            }
+
+            const uint8_t *to_address = field + 4 + 12; // skip function selector + padding
+            const uint8_t *amount = field + 4 + 32;
+
+            tft.drawString("EIP-20 transfer (0xa9059cbb)", x, y);
+            y += line_height;
+            print_hex_tft("to", to_address, 20, x, y);
+            y += line_height;
+
+            print_hex_tft_trim_leading_zeros("amount", amount, 32, x, y);
         } else {
             print_hex_tft(fields[i], field, field_len, x, y);
         }
@@ -205,6 +179,13 @@ void parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
         remaining -= consumed;
         y += line_height;
     }
+
+    // Print remaining bytes if any
+    if (remaining > 0) {
+        print_hex_tft("remaining", p, remaining, x, y);
+    }
+
+    return STATUS_OK;
 }
 
 
@@ -225,21 +206,26 @@ void setup() {  //.......................setup
 
 void loop() { //...............................................................loop
 
-    if(digitalRead(up)==0){
-        tft.drawString("UP",10,50);
-        // Your RLP-encoded EIP-1559 tx bytes (example)
-    const uint8_t tx[] = {
-        0x02, 0xee, 0x82, 0x42, 0x68, 0x1a, 0x83, 0x0f, 0x42, 0x40, 0x83, 0x16, 0xe3, 0x69, 0x82,
-        0x52, 0x08, 0x94, 0x97, 0xed, 0x1e, 0x9f, 0x67, 0x1a, 0x7e, 0xd3, 0xa6, 0x17, 0x3e, 0x7d,
-        0x74, 0x39, 0x36, 0xbb, 0x9c, 0xb2, 0xe1, 0x88, 0x87, 0x03, 0x8d, 0x7e, 0xa4, 0xc6, 0x80,
-        0x00, 0x80, 0xc0
-    };
-
-    parse_eip1559_tx(tx, sizeof(tx));
+    if(digitalRead(up)==0 && bSignConfirmationScreen){
+        // clear screen
+        tft.fillScreen(TFT_BLACK);
+        tft.drawString("TX Approved",10,10);
+        int result = sign_cmd_response(signature, rec_id);
+        if (result != STATUS_OK) {
+            tft.drawString("Wrong Recovery ID",10,20);
+        }
+        secure_memzero(signature, 64);
+        rec_id = 0;
     }
 
     if(digitalRead(down)==0 && bSignConfirmationScreen){
-        tft.drawString("DOWN",10,58);
+        // clear screen
+        tft.fillScreen(TFT_BLACK);
+        secure_memzero(signature, 64);
+        rec_id = 0;
+        tft.drawString("TX Rejected",10,10);
+        uint8_t response = RESPONSE_FAIL;
+        Serial.write(&response, 1);
     }
 
     if (Serial.available()) {  // Check if data is available
@@ -269,19 +255,18 @@ void loop() { //...............................................................l
                     //handle_sign_cmd();
                     uint8_t message[MAX_MSG_LEN];
                     uint16_t msg_len = 0;
-                    uint8_t signature[64] = {0};
-                    uint8_t rec_id = 0;
 
-                    int result = sign_cmd_get_msg_signature123(
+                    int result = sign_cmd_get_msg_signature(
                         signature,
                         &rec_id,
                         message,
                         &msg_len
                     );
-
                     if (result != STATUS_OK) return;
 
-                    parse_eip1559_tx(message, msg_len);
+                    result = parse_eip1559_tx(message, msg_len);
+                    if (result != STATUS_OK) return;
+
                     bSignConfirmationScreen = true;
 
                     //sign_cmd_response(signature, &rec_id);

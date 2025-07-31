@@ -9,6 +9,7 @@
     #define RESPONSE_FAIL 0xF1
     #define ERROR_WRONG_CMD 0x01
     #define ERROR_WRONG_DATA_FORMAT 0x02
+    #define ERROR_WRONG_RECOVERY_ID 0x03
 
     unsigned char ZEROS[32] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

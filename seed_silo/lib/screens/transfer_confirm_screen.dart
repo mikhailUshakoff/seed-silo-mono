@@ -143,21 +143,21 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         const Text('Transaction Details:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Text('Chain ID: ${_chainId?.toString() ?? "null"}'),
+                        Text('Chain ID: ${_chainId?.toRadixString(16) ?? "null"}'),
                         Text('To: ${_transaction!.to?.hex ?? "null"}'),
                         Text('From: ${_transaction!.from?.hex ?? "null"}'),
                         Text(
-                            'Nonce: ${_transaction!.nonce?.toString() ?? "null"}'),
+                            'Nonce: ${_transaction!.nonce?.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Gas: ${_transaction!.maxGas?.toString() ?? "null"}'),
+                            'Gas: ${_transaction!.maxGas?.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Gas Price: ${_transaction!.gasPrice?.getInWei.toString() ?? "null"}'),
+                            'Gas Price: ${_transaction!.gasPrice?.getInWei.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Max Fee Per Gas: ${_transaction!.maxFeePerGas?.getInWei.toString() ?? "null"}'),
+                            'Max Fee Per Gas: ${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Max Priority Fee Per Gas: ${_transaction!.maxPriorityFeePerGas?.getInWei.toString() ?? "null"}'),
+                            'Max Priority Fee Per Gas: ${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Value (in wei): ${_transaction!.value?.getInWei.toString() ?? "null"}'),
+                            'Value (in wei): ${_transaction!.value?.getInWei.toRadixString(16) ?? "null"}'),
                         Text(
                             'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
                         Text(

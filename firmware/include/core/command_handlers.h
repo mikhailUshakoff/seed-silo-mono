@@ -94,7 +94,7 @@ int decode_sign_data(uint8_t *out_private_key, uint8_t *out_message, uint16_t *o
 
 int sign_cmd_get_msg_signature(
     uint8_t* out_signature,
-    uint8_t* out_rec_id,
+    int* out_rec_id,
     uint8_t* out_message,
     uint16_t* out_message_len
 ) {
@@ -144,21 +144,27 @@ int sign_cmd_get_msg_signature(
 
 int sign_cmd_response(
     uint8_t* signature,
-    uint8_t* rec_id
+    int rec_id
 ){
+    if (rec_id < 0 || rec_id > 255) {
+        error_response(ERROR_WRONG_RECOVERY_ID);
+        return STATUS_ERR;
+    }
     uint8_t response[66];
     response[0] = RESPONSE_OK;
     memcpy(response + 1, signature, 64);
-    response[65] = *rec_id;
+    response[65] = (uint8_t)rec_id;
 
     Serial.write(response, sizeof(response));
+
+    return STATUS_OK;
 }
 
 void handle_sign_cmd() {
     uint8_t message[MAX_MSG_LEN];
     uint16_t message_len;
     uint8_t signature[64] = {0};
-    uint8_t rec_id = 0;
+    int rec_id = 0;
 
     int result = sign_cmd_get_msg_signature(
         signature,
@@ -169,7 +175,7 @@ void handle_sign_cmd() {
 
     if (result != STATUS_OK) return;
 
-    sign_cmd_response(signature, &rec_id);
+    sign_cmd_response(signature, rec_id);
 }
 /*
     uint8_t key[32];

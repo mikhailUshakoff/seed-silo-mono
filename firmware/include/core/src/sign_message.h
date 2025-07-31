@@ -15,7 +15,7 @@ void keccak256(uint8_t* input, size_t input_len, uint8_t* output) {
 // sign message hash
 // 1 - success
 // 0 - fail
-int sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, uint8_t* rec_id) {
+int sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, int* rec_id) {
     secp256k1_context *ctx;
     ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
 
@@ -29,10 +29,7 @@ int sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, uint8_t* 
         return 0;
     }
 
-    // Should be safe to cast rec_id to int
-    // I have no idea why rec_id is int,
-    // because we will write only one byte to it *recid = sig->data[64];
-    if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(ctx, output, (int *)rec_id, &signature)){
+    if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(ctx, output, rec_id, &signature)){
         secp256k1_context_destroy(ctx);
         return 0;
     }
