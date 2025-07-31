@@ -109,7 +109,7 @@ class EthWalletService {
     final to = decoded.data[0] as EthereumAddress;
     final value = decoded.data[1] as BigInt;
 
-    return '    Function: $functionName\n    To: ${to.hex}\n    Amount (wei): $value';
+    return '    Function: $functionName\n    To: ${to.hex}\n    Amount (wei): ${value.toRadixString(16)}';
   }
 
   Future<String?> sendTransaction(
@@ -123,7 +123,6 @@ class EthWalletService {
     nullifyUint8List(textPassword);
 
     final rawTransaction = tx.getUnsignedSerialized(chainId: chainId);
-
     final sig =
         await HardwareWalletService().getSignature(password, rawTransaction);
     if (sig == null) {

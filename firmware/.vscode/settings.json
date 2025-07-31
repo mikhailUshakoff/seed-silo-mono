@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "cstdint": "cpp",
+        "system_error": "cpp",
+        "vector": "cpp",
+        "memory": "cpp",
+        "optional": "cpp",
+        "string_view": "cpp",
+        "array": "cpp"
+    }
+}

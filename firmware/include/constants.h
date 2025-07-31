@@ -1,7 +1,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-    #define CMD_CHECK_STATUS 0x01
+    #define CMD_GET_VERSION 0x01
     #define CMD_GET_PUBKEY 0x02
     #define CMD_SIGN 0x03
 
@@ -9,6 +9,7 @@
     #define RESPONSE_FAIL 0xF1
     #define ERROR_WRONG_CMD 0x01
     #define ERROR_WRONG_DATA_FORMAT 0x02
+    #define ERROR_WRONG_RECOVERY_ID 0x03
 
     unsigned char ZEROS[32] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -7,13 +7,187 @@
 #include <input.h>
 
 #include "constants.h"
-#include "core/core.h"
+#include <core/command_handlers.h>
 
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprite = TFT_eSprite(&tft);
 
 #define down 0
 #define up 14
+
+bool bSignConfirmationScreen = false;
+uint8_t signature[64] = {0};
+int rec_id = 0;
+
+void tft_drawString(const char* str, int x, int y) {
+    // For demo, just print with coordinates
+    printf("TFT @(%d,%d): %s\n", x, y, str);
+}
+
+// RLP length decode: handles strings and lists (short and long)
+int rlp_read_length(const uint8_t *data, size_t data_len, size_t *out_len, size_t *out_offset) {
+    if (data_len == 0) return -1;
+
+    uint8_t prefix = data[0];
+
+    if (prefix <= 0x7f) {
+        *out_len = 1;
+        *out_offset = 0;
+        return 0;
+    } else if (prefix <= 0xb7) {
+        size_t len = prefix - 0x80;
+        if (len > data_len - 1) return -1;
+        *out_len = len;
+        *out_offset = 1;
+        return 0;
+    } else if (prefix <= 0xbf) {
+        size_t len_of_len = prefix - 0xb7;
+        if (len_of_len + 1 > data_len) return -1;
+        size_t len = 0;
+        for (size_t i = 0; i < len_of_len; i++) {
+            len = (len << 8) | data[1 + i];
+        }
+        if (len + len_of_len + 1 > data_len) return -1;
+        *out_len = len;
+        *out_offset = 1 + len_of_len;
+        return 0;
+    } else if (prefix <= 0xf7) {
+        size_t len = prefix - 0xc0;
+        if (len > data_len - 1) return -1;
+        *out_len = len;
+        *out_offset = 1;
+        return 0;
+    } else if (prefix <= 0xff) {
+        size_t len_of_len = prefix - 0xf7;
+        if (len_of_len + 1 > data_len) return -1;
+        size_t len = 0;
+        for (size_t i = 0; i < len_of_len; i++) {
+            len = (len << 8) | data[1 + i];
+        }
+        if (len + len_of_len + 1 > data_len) return -1;
+        *out_len = len;
+        *out_offset = 1 + len_of_len;
+        return 0;
+    }
+
+    return -1;
+}
+
+// Reads a single RLP item (string or list element) from data buffer
+const uint8_t* rlp_read_item(const uint8_t *data, size_t data_len, size_t *item_len, size_t *consumed) {
+    size_t len = 0, offset = 0;
+    if (rlp_read_length(data, data_len, &len, &offset) != 0) return NULL;
+    if (offset + len > data_len) return NULL;
+    *item_len = len;
+    *consumed = offset + len;
+    return data + offset;
+}
+
+// Utility: Print hex to TFT (or console here) with label at (x,y)
+void print_hex_tft(const char *label, const uint8_t *data, size_t len, int x, int y) {
+    char buf[256] = {0};
+    int written = snprintf(buf, sizeof(buf), "%s: 0x", label);
+    for (size_t i = 0; i < len && written < (int)(sizeof(buf) - 3); i++) {
+        written += snprintf(buf + written, sizeof(buf) - written, "%02x", data[i]);
+    }
+    tft.drawString(buf, x, y);
+}
+
+void print_hex_tft_trim_leading_zeros(const char *label, const uint8_t *data, size_t len, int x, int y) {
+    char buf[256] = {0};
+    int written = snprintf(buf, sizeof(buf), "%s: 0x", label);
+
+    size_t start = 0;
+    while (start < len && data[start] == 0) {
+        start++;
+    }
+
+    for (size_t i = start; i < len && written < (int)(sizeof(buf) - 3); i++) {
+        written += snprintf(buf + written, sizeof(buf) - written, "%02x", data[i]);
+    }
+
+    if (start == len) {
+        written += snprintf(buf + written, sizeof(buf) - written, "0");
+    }
+
+    tft.drawString(buf, x, y);
+}
+
+// Main parser: parse EIP-1559 type-2 tx and print all fields
+int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
+    if (len < 2 || tx[0] != 0x02) {
+        tft.drawString("Not a type-2 tx", 10, 15);
+        print_hex_tft("tx", tx, len, 10, 30);
+        return STATUS_ERR;
+    }
+
+    const uint8_t *rlp = tx + 1;
+    size_t rlp_len = len - 1;
+
+    size_t list_len = 0, list_offset = 0;
+    if (rlp_read_length(rlp, rlp_len, &list_len, &list_offset) != 0) {
+        tft.drawString("RLP list parse fail", 10, 15);
+        return STATUS_ERR;
+    }
+
+    if (list_offset + list_len > rlp_len) {
+        tft.drawString("RLP list length invalid", 10, 15);
+        return STATUS_ERR;
+    }
+
+    const uint8_t *p = rlp + list_offset;
+    size_t remaining = list_len;
+
+    const char *fields[] = {
+        "chain_id", "nonce", "max_priority_fee_per_gas", "max_fee_per_gas",
+        "gas_limit", "to", "value", "data"
+    };
+    int num_fields = sizeof(fields) / sizeof(fields[0]);
+
+    int x = 10;
+    int y = 15;
+    int line_height = 10;
+
+    for (int i = 0; i < num_fields && remaining > 0; i++) {
+        size_t field_len = 0, consumed = 0;
+        const uint8_t *field = rlp_read_item(p, remaining, &field_len, &consumed);
+        if (!field) {
+            tft.drawString("RLP field parse fail", x, y);
+            return STATUS_ERR;
+        }
+
+        if (i == 7 && field_len > 0) {
+            if (field_len != 4 + 32 + 32 || memcmp(field, "\xa9\x05\x9c\xbb", 4) != 0) {
+                tft.drawString("Not EIP-20 transfer", x, y);
+                return STATUS_ERR;
+            }
+
+            const uint8_t *to_address = field + 4 + 12; // skip function selector + padding
+            const uint8_t *amount = field + 4 + 32;
+
+            tft.drawString("EIP-20 transfer (0xa9059cbb)", x, y);
+            y += line_height;
+            print_hex_tft("to", to_address, 20, x, y);
+            y += line_height;
+
+            print_hex_tft_trim_leading_zeros("amount", amount, 32, x, y);
+        } else {
+            print_hex_tft(fields[i], field, field_len, x, y);
+        }
+
+        p += consumed;
+        remaining -= consumed;
+        y += line_height;
+    }
+
+    // Print remaining bytes if any
+    if (remaining > 0) {
+        print_hex_tft("remaining", p, remaining, x, y);
+    }
+
+    return STATUS_OK;
+}
+
 
 void setup() {  //.......................setup
 
@@ -31,6 +205,29 @@ void setup() {  //.......................setup
 }
 
 void loop() { //...............................................................loop
+
+    if(digitalRead(up)==0 && bSignConfirmationScreen){
+        // clear screen
+        tft.fillScreen(TFT_BLACK);
+        tft.drawString("TX Approved",10,10);
+        int result = sign_cmd_response(signature, rec_id);
+        if (result != STATUS_OK) {
+            tft.drawString("Wrong Recovery ID",10,20);
+        }
+        secure_memzero(signature, 64);
+        rec_id = 0;
+    }
+
+    if(digitalRead(down)==0 && bSignConfirmationScreen){
+        // clear screen
+        tft.fillScreen(TFT_BLACK);
+        secure_memzero(signature, 64);
+        rec_id = 0;
+        tft.drawString("TX Rejected",10,10);
+        uint8_t response = RESPONSE_FAIL;
+        Serial.write(&response, 1);
+    }
+
     if (Serial.available()) {  // Check if data is available
         // clear screen
         tft.fillScreen(TFT_BLACK);
@@ -40,117 +237,62 @@ void loop() { //...............................................................l
 
         if (len > 0) {
             switch (cmd_input) {
-                case CMD_CHECK_STATUS:
+                case CMD_GET_VERSION:
                 {
                     tft.drawString("CMD: check status1",10,10);
-                    uint8_t response_ok = RESPONSE_OK;
-                    Serial.write(&response_ok, 1);
+                    handle_get_version_cmd();
                     break;
                 }
                 case CMD_GET_PUBKEY:
                 {
                     tft.drawString("CMD: get public key",10,10);
-
-                    uint8_t key_hash[32];
-                    size_t len = Serial.readBytes(key_hash, 32);
-
-                    if (len != 32) {
-                        break;
-                    }
-
-                    uint8_t private_key[32];
-                    decrypt_private_key(key_hash, private_key);
-
-                    uint8_t public_key[65] = {0};
-                    int response = get_public_key(private_key, public_key);
-
-                    memcpy(private_key, ZEROS, 32);
-
-                    uint8_t response_ok[66];
-                    if (response) {
-                        response_ok[0] = RESPONSE_OK;
-                    } else {
-                        response_ok[0] = RESPONSE_FAIL;
-                    }
-                    response_ok[0] = RESPONSE_OK;
-                    memcpy(response_ok+1, public_key, 65);
-
-                    Serial.write(response_ok, 66);
-
+                    handle_get_pubkey_cmd();
                     break;
                 }
                 case CMD_SIGN:
                 {
-                    tft.drawString("CMD: sign",10,10);
+                    tft.drawString("CMD: sign",5,5);
+                    //handle_sign_cmd();
+                    uint8_t message[MAX_MSG_LEN];
+                    uint16_t msg_len = 0;
 
-                    uint8_t key_hash[32];
-                    size_t len = Serial.readBytes(key_hash, 32);
-                    if (len != 32) break;
+                    int result = sign_cmd_get_msg_signature(
+                        signature,
+                        &rec_id,
+                        message,
+                        &msg_len
+                    );
+                    if (result != STATUS_OK) return;
 
-                    uint8_t private_key[32];
-                    decrypt_private_key(key_hash, private_key);
+                    result = parse_eip1559_tx(message, msg_len);
+                    if (result != STATUS_OK) return;
 
-                    uint8_t message_len_bytes[2];
-                    len = Serial.readBytes(message_len_bytes, 2);
+                    bSignConfirmationScreen = true;
 
-                    if (len != 2) {
-                        uint8_t output[1] = {ERROR_WRONG_DATA_FORMAT};
-                        Serial.write(output, 1);
+                    //sign_cmd_response(signature, &rec_id);
+                    /*uint8_t private_key[32];
+                    uint8_t message[MAX_MSG_LEN];
+                    uint16_t msg_len = 0;
+
+                    if (decode_sign_data(private_key, message, &msg_len) == STATUS_ERR) {
                         return;
                     }
-
-                    // Convert 2 bytes to uint16_t (big-endian)
-                    uint16_t message_len = (message_len_bytes[0] << 8) | message_len_bytes[1];
-
-                    if (message_len == 0 || message_len > 1024) {
-                        uint8_t output[1] = {ERROR_WRONG_DATA_FORMAT};
-                        Serial.write(output, 1);
-                        return;
-                    }
-                    // Read message of `message_len` bytes
-                    uint8_t* message = new uint8_t[message_len];
-                    size_t actual_len = Serial.readBytes(message, message_len);
-
-                    if (actual_len != message_len) {
-                        delete[] message;
-                        uint8_t output[1] = {ERROR_WRONG_DATA_FORMAT};
-                        Serial.write(output, 1);
-                        return;
-                    }
-
-                    uint8_t message_hash[32] = {0};
-                    keccak256(message, message_len, message_hash);
-
-                    // Remember to free heap memory
-                    delete[] message;
-
-                    uint8_t signature[64] = {0};
-                    uint8_t rec_id[1] = {0};
-                    int response = sign(private_key, message_hash, signature, rec_id);
-
-                    memcpy(private_key, ZEROS, 32);
-
-                    uint8_t response_ok[66];
-                    if (response) {
-                        response_ok[0] = RESPONSE_OK;
-                    } else {
-                        response_ok[0] = RESPONSE_FAIL;
-                    }
-                    memcpy(response_ok+1, signature, 64);
-                    memcpy(response_ok+65, &rec_id, 1);
-
-                    Serial.write(response_ok, 66);
+                    parse_eip1559_tx(message, msg_len);
+                    bSignConfirmationScreen = true;*/
                     break;
                 }
                 default:
                 {
-                    tft.drawString("CMD: error",10,30);
+                    tft.drawString("CMD: unknown",10,30);
                     uint8_t response_err = ERROR_WRONG_CMD;
                     Serial.write(&response_err, 1);
                 }
             }
+        } else {
+            tft.drawString("SERIAL: no data",10,30);
         }
     }
 
     delay(1000);
 }
+
