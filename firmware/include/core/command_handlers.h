@@ -117,14 +117,14 @@ int sign_cmd_get_msg_signature(
 
     *out_message_len = (len_bytes[0] << 8) | len_bytes[1];
     if (*out_message_len == 0 || *out_message_len > MAX_MSG_LEN) {
-        error_response(ERROR_WRONG_DATA_FORMAT);
         secure_memzero(private_key, sizeof(private_key));
+        error_response(ERROR_WRONG_DATA_FORMAT);
         return STATUS_ERR;
     }
 
     if (Serial.readBytes(out_message, *out_message_len) != *out_message_len) {
-        error_response(ERROR_WRONG_DATA_FORMAT);
         secure_memzero(private_key, sizeof(private_key));
+        error_response(ERROR_WRONG_DATA_FORMAT);
         return STATUS_ERR;
     }
 
