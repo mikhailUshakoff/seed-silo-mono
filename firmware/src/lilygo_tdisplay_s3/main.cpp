@@ -207,6 +207,7 @@ void setup() {  //.......................setup
 void loop() { //...............................................................loop
 
     if(digitalRead(up)==0 && bSignConfirmationScreen){
+        bSignConfirmationScreen = false;
         // clear screen
         tft.fillScreen(TFT_BLACK);
         tft.drawString("TX Approved",10,10);
@@ -219,6 +220,7 @@ void loop() { //...............................................................l
     }
 
     if(digitalRead(down)==0 && bSignConfirmationScreen){
+        bSignConfirmationScreen = false;
         // clear screen
         tft.fillScreen(TFT_BLACK);
         secure_memzero(signature, 64);
@@ -226,6 +228,18 @@ void loop() { //...............................................................l
         tft.drawString("TX Rejected",10,10);
         uint8_t response = RESPONSE_FAIL;
         Serial.write(&response, 1);
+    }
+
+    if(bSignConfirmationScreen){
+        // display: 320, 170
+        // draw approve icon
+        tft.fillRect(290, 10, 20, 20, TFT_GREEN);
+        tft.drawWideLine(298, 26, 306, 14, 3, TFT_BLACK);
+        tft.drawWideLine(298, 26, 294, 18, 3, TFT_BLACK);
+        // draw reject icon
+        tft.fillRect(290, 140, 20, 20, TFT_RED);
+        tft.drawWideLine(294, 144, 306, 156, 3, TFT_BLACK);
+        tft.drawWideLine(294, 156, 306, 144, 3, TFT_BLACK);
     }
 
     if (Serial.available()) {  // Check if data is available
