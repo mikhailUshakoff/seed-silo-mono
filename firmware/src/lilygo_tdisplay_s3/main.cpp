@@ -16,7 +16,6 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 #define up 14
 
 bool bSignConfirmationScreen = false;
-bool bConfirmationScreenDrawn = false;
 uint8_t signature[64] = {0};
 int rec_id = 0;
 
