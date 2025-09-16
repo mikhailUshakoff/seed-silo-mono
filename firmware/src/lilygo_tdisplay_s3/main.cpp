@@ -84,32 +84,54 @@ const uint8_t* rlp_read_item(const uint8_t *data, size_t data_len, size_t *item_
 }
 
 // Utility: Print hex to TFT (or console here) with label at (x,y)
-void print_hex_tft(const char *label, const uint8_t *data, size_t len, int x, int y) {
-    char buf[256] = {0};
-    int written = snprintf(buf, sizeof(buf), "%s: 0x", label);
-    for (size_t i = 0; i < len && written < (int)(sizeof(buf) - 3); i++) {
-        written += snprintf(buf + written, sizeof(buf) - written, "%02x", data[i]);
+static int format_hex_string(char *buf, size_t buf_size,
+    const char *label,
+    const uint8_t *data, size_t len,
+    bool trim_leading_zeros
+) {
+    int written = snprintf(buf, buf_size, "%s: 0x", label);
+    if (written < 0 || (size_t)written >= buf_size) return written;
+
+    size_t start = 0;
+    if (trim_leading_zeros) {
+        while (start < len && data[start] == 0) {
+            start++;
+        }
     }
+
+    if (start == len) {
+        // All zeros
+        written += snprintf(buf + written, buf_size - written, "0");
+        return written;
+    }
+
+    for (size_t i = start; i < len && (size_t)written < buf_size - 3; i++) {
+        written += snprintf(buf + written, buf_size - written, "%02x", data[i]);
+    }
+
+    return written;
+}
+
+void print_hex_tft(const char *label, const uint8_t *data, size_t len, int x, int y) {
+    char buf[256];
+    format_hex_string(buf, sizeof(buf), label, data, len, false);
+    tft.drawString(buf, x, y);
+}
+
+void print_chain_id_tft(const char *label, const uint8_t *data, size_t len, int x, int y) {
+    char buf[256];
+    int written = format_hex_string(buf, sizeof(buf), label, data, len, false);
+
+    if (len >= 2 && memcmp(data, "\x42\x68", 2) == 0) {
+        snprintf(buf + written, sizeof(buf) - written, " (Holesky)");
+    }
+
     tft.drawString(buf, x, y);
 }
 
 void print_hex_tft_trim_leading_zeros(const char *label, const uint8_t *data, size_t len, int x, int y) {
-    char buf[256] = {0};
-    int written = snprintf(buf, sizeof(buf), "%s: 0x", label);
-
-    size_t start = 0;
-    while (start < len && data[start] == 0) {
-        start++;
-    }
-
-    for (size_t i = start; i < len && written < (int)(sizeof(buf) - 3); i++) {
-        written += snprintf(buf + written, sizeof(buf) - written, "%02x", data[i]);
-    }
-
-    if (start == len) {
-        written += snprintf(buf + written, sizeof(buf) - written, "0");
-    }
-
+    char buf[256];
+    format_hex_string(buf, sizeof(buf), label, data, len, true);
     tft.drawString(buf, x, y);
 }
 
@@ -156,23 +178,33 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
             return STATUS_ERR;
         }
 
-        if (i == 7 && field_len > 0) {
+        if (i == 0) {
+            print_chain_id_tft(fields[i], field, field_len, x, y);
+        } else if (i == 7 && field_len > 0) {
             if (field_len != 4 + 32 + 32 || memcmp(field, "\xa9\x05\x9c\xbb", 4) != 0) {
                 tft.drawString("Not EIP-20 transfer", x, y);
                 return STATUS_ERR;
             }
-
             const uint8_t *to_address = field + 4 + 12; // skip function selector + padding
             const uint8_t *amount = field + 4 + 32;
 
             tft.drawString("EIP-20 transfer (0xa9059cbb)", x, y);
+            x += 5;
             y += line_height;
             print_hex_tft("to", to_address, 20, x, y);
             y += line_height;
 
             print_hex_tft_trim_leading_zeros("amount", amount, 32, x, y);
+            x -= 5;
         } else {
             print_hex_tft(fields[i], field, field_len, x, y);
+        }
+
+        if ( i==4 || i==7 ) {
+            y += line_height;
+            tft.setTextColor(TFT_SILVER, TFT_BLACK);
+            tft.drawString("------------------------------------------------", x-5, y);
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
         }
 
         p += consumed;
@@ -186,6 +218,18 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
     }
 
     return STATUS_OK;
+}
+
+void drawSignConfirmationUI() {
+    // display: 320, 170
+    // draw approve icon
+    tft.fillRect(290, 10, 20, 20, TFT_GREEN);
+    tft.drawWideLine(298, 26, 306, 14, 3, TFT_BLACK);
+    tft.drawWideLine(298, 26, 294, 18, 3, TFT_BLACK);
+    // draw reject icon
+    tft.fillRect(290, 140, 20, 20, TFT_RED);
+    tft.drawWideLine(294, 144, 306, 156, 3, TFT_BLACK);
+    tft.drawWideLine(294, 156, 306, 144, 3, TFT_BLACK);
 }
 
 
@@ -230,18 +274,6 @@ void loop() { //...............................................................l
         Serial.write(&response, 1);
     }
 
-    if(bSignConfirmationScreen){
-        // display: 320, 170
-        // draw approve icon
-        tft.fillRect(290, 10, 20, 20, TFT_GREEN);
-        tft.drawWideLine(298, 26, 306, 14, 3, TFT_BLACK);
-        tft.drawWideLine(298, 26, 294, 18, 3, TFT_BLACK);
-        // draw reject icon
-        tft.fillRect(290, 140, 20, 20, TFT_RED);
-        tft.drawWideLine(294, 144, 306, 156, 3, TFT_BLACK);
-        tft.drawWideLine(294, 156, 306, 144, 3, TFT_BLACK);
-    }
-
     if (Serial.available()) {  // Check if data is available
         // clear screen
         tft.fillScreen(TFT_BLACK);
@@ -266,7 +298,6 @@ void loop() { //...............................................................l
                 case CMD_SIGN:
                 {
                     tft.drawString("CMD: sign",5,5);
-                    //handle_sign_cmd();
                     uint8_t message[MAX_MSG_LEN];
                     uint16_t msg_len = 0;
 
@@ -283,16 +314,8 @@ void loop() { //...............................................................l
 
                     bSignConfirmationScreen = true;
 
-                    //sign_cmd_response(signature, &rec_id);
-                    /*uint8_t private_key[32];
-                    uint8_t message[MAX_MSG_LEN];
-                    uint16_t msg_len = 0;
+                    drawSignConfirmationUI();
 
-                    if (decode_sign_data(private_key, message, &msg_len) == STATUS_ERR) {
-                        return;
-                    }
-                    parse_eip1559_tx(message, msg_len);
-                    bSignConfirmationScreen = true;*/
                     break;
                 }
                 default:
