@@ -17,7 +17,6 @@ class _TransferScreenState extends State<TransferScreen> {
   final TextEditingController _destinationController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
 
-
   @override
   void dispose() {
     _destinationController.dispose();

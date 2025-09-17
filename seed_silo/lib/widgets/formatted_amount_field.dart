@@ -55,15 +55,14 @@ class _FormattedAmountFieldState extends State<FormattedAmountField> {
     final decimalPart = match.group(2) ?? '';
 
     final reversed = integerPart.split('').reversed.join();
-    final spacedReversed = RegExp(r'.{1,3}')
-        .allMatches(reversed)
-        .map((m) => m.group(0))
-        .join(' ');
+    final spacedReversed =
+        RegExp(r'.{1,3}').allMatches(reversed).map((m) => m.group(0)).join(' ');
     final formattedInteger = spacedReversed.split('').reversed.join();
 
     final formatted = '$formattedInteger$decimalPart';
 
-    int numSpacesBefore = ' '.allMatches(oldText.substring(0, oldSelection)).length;
+    int numSpacesBefore =
+        ' '.allMatches(oldText.substring(0, oldSelection)).length;
     int cursorPosRaw = oldSelection - numSpacesBefore;
     int newCursorPos = 0;
     int digitsSeen = 0;

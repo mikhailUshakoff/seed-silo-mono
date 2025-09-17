@@ -10,7 +10,6 @@ import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
-
 /// rewardPercentileIndex is an integer that represents which percentile of priority fees
 /// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
 /// are determined by percentile ranges. The available values are:
@@ -85,7 +84,7 @@ class EthWalletService {
     return list;
   }
 
-  String? decodeTransactionData(Uint8List? data) {
+  String? decodeTransactionData(Uint8List? data, int decimals) {
     if (data == null || data.isEmpty) return null;
 
     final contract = DeployedContract(
@@ -109,7 +108,52 @@ class EthWalletService {
     final to = decoded.data[0] as EthereumAddress;
     final value = decoded.data[1] as BigInt;
 
-    return '    Function: $functionName\n    To: ${to.hex}\n    Amount (wei): ${value.toRadixString(16)}';
+    final str = convert2Decimal(value, decimals);
+    return '    Function: $functionName\n    To: 0x${to.hex}\n    Amount (wei): 0x${value.toRadixString(16)} ($str)';
+  }
+
+  String convert2Decimal(BigInt value, int decimals) {
+    String str = value.toRadixString(10);
+
+    // Add decimal point
+    String formatted;
+    if (str.length <= decimals) {
+      final padded = str.padLeft(decimals, '0');
+      formatted = "0.$padded";
+    } else {
+      final insertPoint = str.length - decimals;
+      formatted =
+          "${str.substring(0, insertPoint)}.${str.substring(insertPoint)}";
+    }
+
+    // Split into integer and fractional parts
+    final parts = formatted.split('.');
+    final integerPart = parts[0];
+    final fractionalPart = parts.length > 1 ? parts[1] : '';
+
+    // Format integer part with thousand separators
+    final formattedInteger = _formatWithSeparators(integerPart);
+
+    // Format fractional part in groups of 3 digits
+    final formattedFractional = _formatWithSeparators(fractionalPart);
+
+    return formattedFractional.isNotEmpty
+        ? '$formattedInteger.$formattedFractional'
+        : formattedInteger;
+  }
+
+  String _formatWithSeparators(String number) {
+    final buffer = StringBuffer();
+    final length = number.length;
+
+    for (int i = 0; i < length; i++) {
+      if (i > 0 && (length - i) % 3 == 0) {
+        buffer.write('_');
+      }
+      buffer.write(number[i]);
+    }
+
+    return buffer.toString();
   }
 
   Future<String?> sendTransaction(
@@ -180,15 +224,13 @@ class EthWalletService {
     }
   }
 
-
-
   Future<(BigInt, Transaction)?> buildEip1559Transaction(
     String from,
     String token,
     String dst,
-    String amount,
-    {RewardPercentile rewardPercentile = RewardPercentile.low,}
-  ) async {
+    String amount, {
+    RewardPercentile rewardPercentile = RewardPercentile.low,
+  }) async {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
@@ -201,8 +243,8 @@ class EthWalletService {
     if (gasInEIP1559.length != 3) {
       return null;
     }
-    final maxPriorityFeePerGas =
-        EtherAmount.inWei(gasInEIP1559[rewardPercentile.index].maxPriorityFeePerGas);
+    final maxPriorityFeePerGas = EtherAmount.inWei(
+        gasInEIP1559[rewardPercentile.index].maxPriorityFeePerGas);
     final maxFeePerGas =
         EtherAmount.inWei(gasInEIP1559[rewardPercentile.index].maxFeePerGas);
 

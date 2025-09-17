@@ -143,25 +143,24 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         const Text('Transaction Details:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Text('Chain ID: ${_chainId?.toRadixString(16) ?? "null"}'),
+                        Text(
+                            'Chain ID: 0x${_chainId?.toRadixString(16) ?? "null"}'),
+                        Text(
+                            'Nonce: 0x${_transaction!.nonce?.toRadixString(16) ?? "null"}'),
+                        Text(
+                            'Max Priority Fee Per Gas: 0x${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${EthWalletService().convert2Decimal(_transaction!.maxPriorityFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
+                        Text(
+                            'Max Fee Per Gas: 0x${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${EthWalletService().convert2Decimal(_transaction!.maxFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
+                        Text(
+                            'Gas limit: 0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? EthWalletService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
+                        Text('------------'),
                         Text('To: ${_transaction!.to?.hex ?? "null"}'),
-                        Text('From: ${_transaction!.from?.hex ?? "null"}'),
                         Text(
-                            'Nonce: ${_transaction!.nonce?.toRadixString(16) ?? "null"}'),
-                        Text(
-                            'Gas: ${_transaction!.maxGas?.toRadixString(16) ?? "null"}'),
-                        Text(
-                            'Gas Price: ${_transaction!.gasPrice?.getInWei.toRadixString(16) ?? "null"}'),
-                        Text(
-                            'Max Fee Per Gas: ${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"}'),
-                        Text(
-                            'Max Priority Fee Per Gas: ${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"}'),
-                        Text(
-                            'Value (in wei): ${_transaction!.value?.getInWei.toRadixString(16) ?? "null"}'),
+                            'Value (in wei): 0x${_transaction!.value?.getInWei.toRadixString(16) ?? "null"}'),
                         Text(
                             'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
                         Text(
-                            'Decoded Data:\n${_transaction!.data != null ? EthWalletService().decodeTransactionData(_transaction!.data) : "null"}'),
+                            'Decoded Data:\n${_transaction!.data != null ? EthWalletService().decodeTransactionData(_transaction!.data, widget.token.decimals) : "null"}'),
                       ],
                     )
                   : const SizedBox.shrink(),
