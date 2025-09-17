@@ -5,7 +5,8 @@ import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/crypto.dart';
 
 class HardwareWalletService {
-  static final HardwareWalletService _instance = HardwareWalletService._internal();
+  static final HardwareWalletService _instance =
+      HardwareWalletService._internal();
   factory HardwareWalletService() => _instance;
 
   HardwareWalletService._internal();
@@ -28,14 +29,14 @@ class HardwareWalletService {
     return null;
   }
 
-
   Uint8List intTo2Bytes(int value) {
     final bytes = ByteData(2);
     bytes.setUint16(0, value, Endian.big);
     return bytes.buffer.asUint8List();
   }
 
-  Future<MsgSignature?> getSignature(Uint8List password, Uint8List rawTransaction) async {
+  Future<MsgSignature?> getSignature(
+      Uint8List password, Uint8List rawTransaction) async {
     final request = [getSignatureCmd];
     request.addAll(password);
     nullifyUint8List(password);
@@ -61,11 +62,8 @@ class HardwareWalletService {
     final s = buffer.sublist(33, 65);
     final v = buffer[65];
 
-    final sig = MsgSignature(
-      BigInt.parse(bytesToHex(r),radix: 16),
-      BigInt.parse(bytesToHex(s),radix: 16),
-      v
-    );
+    final sig = MsgSignature(BigInt.parse(bytesToHex(r), radix: 16),
+        BigInt.parse(bytesToHex(s), radix: 16), v);
     return sig;
   }
 
@@ -80,7 +78,7 @@ class HardwareWalletService {
     await Future.delayed(Duration(seconds: 2));
 
     final buffer = await SerialService().read(66);
-    if ( buffer?.length == 66 || buffer?[0] == 0xF0) {
+    if (buffer?.length == 66 || buffer?[0] == 0xF0) {
       return buffer?.sublist(2);
     }
 

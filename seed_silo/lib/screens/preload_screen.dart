@@ -42,11 +42,11 @@ class _PreloadScreenState extends State<PreloadScreen> {
         onTap: _handleLogoTap,
         child: Center(
           child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildLogo(),
-                  ],
-                ),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildLogo(),
+            ],
+          ),
         ),
       ),
     );
