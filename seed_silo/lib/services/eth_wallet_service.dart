@@ -5,19 +5,12 @@ import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:seed_silo/models/network.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
-/// rewardPercentileIndex is an integer that represents which percentile of priority fees
-/// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
-/// are determined by percentile ranges. The available values are:
-/// low - 25th percentile
-/// medium - 50th percentile
-/// high - 75th percentile
-/// These indices are used to select the corresponding priority fee from the list of fees
-/// returned by the getGasInEIP1559 function.
 enum RewardPercentile { low, medium, high }
 
 class EthWalletService {
@@ -25,9 +18,10 @@ class EthWalletService {
   factory EthWalletService() => _instance;
   EthWalletService._internal();
 
-  static const String _tokensKey = 'tokens';
+  static const String _networksKey = 'networks';
+  static const String _currentNetworkKey = 'current_network';
+  static const String _tokensKeyPrefix = 'tokens_';
 
-  static const String rpcUrl = 'https://ethereum-holesky-rpc.publicnode.com';
   static const String _ethAddress =
       '0x0000000000000000000000000000000000000000';
   static const String erc20Abi = '''
@@ -39,7 +33,9 @@ class EthWalletService {
       ]
     ''';
 
-  List<Token> _tokens = [];
+  List<Network> _networks = [];
+  Network? _currentNetwork;
+  final Map<String, List<Token>> _tokensByNetwork = {};
 
   bool isEthToken(String token) => token == _ethAddress;
 
@@ -72,7 +68,7 @@ class EthWalletService {
       ..add(transaction.value?.getInWei)
       ..add(transaction.data);
 
-    list.add([]); // access list
+    list.add([]);
 
     if (signature != null) {
       list
@@ -89,8 +85,7 @@ class EthWalletService {
 
     final contract = DeployedContract(
       ContractAbi.fromJson(erc20Abi, 'ERC20'),
-      EthereumAddress.fromHex(
-          _ethAddress), // dummy address, not used for decoding
+      EthereumAddress.fromHex(_ethAddress),
     );
 
     final function = contract.function('transfer');
@@ -99,7 +94,7 @@ class EthWalletService {
         ? bytesToHex(data.sublist(0, 4), include0x: true)
         : "transfer (0xa9059cbb)";
 
-    final paramData = data.sublist(4); // skip selector
+    final paramData = data.sublist(4);
     final decoded = TupleType([
       AddressType(),
       UintType(length: 256),
@@ -115,7 +110,6 @@ class EthWalletService {
   String convert2Decimal(BigInt value, int decimals) {
     String str = value.toRadixString(10);
 
-    // Add decimal point
     String formatted;
     if (str.length <= decimals) {
       final padded = str.padLeft(decimals, '0');
@@ -126,15 +120,11 @@ class EthWalletService {
           "${str.substring(0, insertPoint)}.${str.substring(insertPoint)}";
     }
 
-    // Split into integer and fractional parts
     final parts = formatted.split('.');
     final integerPart = parts[0];
     final fractionalPart = parts.length > 1 ? parts[1] : '';
 
-    // Format integer part with thousand separators
     final formattedInteger = _formatWithSeparators(integerPart);
-
-    // Format fractional part in groups of 3 digits
     final formattedFractional = _formatWithSeparators(fractionalPart);
 
     return formattedFractional.isNotEmpty
@@ -174,12 +164,12 @@ class EthWalletService {
     }
 
     final signedTransaction = _encodeEIP1559ToRlp(tx, sig, chainId);
-    final signedRlp = encode(signedTransaction); //rlp
+    final signedRlp = encode(signedTransaction);
     Uint8List tx2Send = Uint8List.fromList(signedRlp);
-    // tx is EIP1559 add prefix 0x02
     tx2Send = prependTransactionType(0x02, tx2Send);
 
-    final Web3Client client = Web3Client(rpcUrl, Client());
+    if (_currentNetwork == null) return null;
+    final Web3Client client = Web3Client(_currentNetwork!.rpcUrl, Client());
     String sendTxHash = await client.sendRawTransaction(tx2Send);
 
     return sendTxHash;
@@ -197,14 +187,16 @@ class EthWalletService {
   }
 
   Future<BigInt> getBalance(String wallet, String token) async {
+    if (_currentNetwork == null) return BigInt.zero;
+
     final httpClient = http.Client();
-    final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
+    final Web3Client ethClient = Web3Client(_currentNetwork!.rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(wallet);
+
     if (isEthToken(token)) {
       final balance = await ethClient.getBalance(walletAddress);
       return balance.getInWei;
     } else {
-      //ERC20 get balance
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(token);
 
       final contract = DeployedContract(
@@ -231,8 +223,10 @@ class EthWalletService {
     String amount, {
     RewardPercentile rewardPercentile = RewardPercentile.low,
   }) async {
+    if (_currentNetwork == null) return null;
+
     final httpClient = http.Client();
-    final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
+    final Web3Client ethClient = Web3Client(_currentNetwork!.rpcUrl, httpClient);
 
     final sender = EthereumAddress.fromHex(from);
     final dstAddress = EthereumAddress.fromHex(dst);
@@ -249,14 +243,13 @@ class EthWalletService {
         EtherAmount.inWei(gasInEIP1559[rewardPercentile.index].maxFeePerGas);
 
     if (isEthToken(token)) {
-      // Build ETH transfer
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
       return (
         chainId,
         Transaction(
           to: dstAddress,
           value: value,
-          maxGas: 21000, // Standard ETH transfer gas limit
+          maxGas: 21000,
           nonce: nonce,
           maxFeePerGas: maxFeePerGas,
           maxPriorityFeePerGas: maxPriorityFeePerGas,
@@ -264,7 +257,6 @@ class EthWalletService {
         )
       );
     } else {
-      // Build ERC-20 token transfer
       final tokenAddress = EthereumAddress.fromHex(token);
       final contract = DeployedContract(
         ContractAbi.fromJson(erc20Abi, 'ERC20'),
@@ -272,7 +264,7 @@ class EthWalletService {
       );
 
       final transferFunction = contract.function('transfer');
-      final amountInt = BigInt.parse(amount); // Already in wei
+      final amountInt = BigInt.parse(amount);
       final data = transferFunction.encodeCall([dstAddress, amountInt]);
 
       try {
@@ -303,55 +295,161 @@ class EthWalletService {
     }
   }
 
-  Future<List<Token>> getTokens() async {
-    if (_tokens.isNotEmpty) return _tokens;
+  // Network management
+  Future<List<Network>> getNetworks() async {
+    if (_networks.isNotEmpty) return _networks;
 
     final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_tokensKey);
+    final jsonString = prefs.getString(_networksKey);
 
     if (jsonString == null) {
-      // Default token ETH
-      _tokens = [
+      _networks = [
+        Network(
+          id: 'holesky',
+          name: 'Ethereum Holesky',
+          rpcUrl: 'https://ethereum-holesky-rpc.publicnode.com',
+          chainId: 17000,
+        ),
+      ];
+      await _saveNetworks();
+    } else {
+      final List<dynamic> jsonList = json.decode(jsonString);
+      _networks = jsonList.map((e) => Network.fromJson(e)).toList();
+    }
+
+    return _networks;
+  }
+
+  Future<void> addNetwork(Network network) async {
+    if (_networks.any((n) => n.id == network.id)) {
+      return;
+    }
+    _networks.add(network);
+    await _saveNetworks();
+  }
+
+  Future<void> removeNetwork(String networkId) async {
+    _networks.removeWhere((n) => n.id == networkId);
+    await _saveNetworks();
+
+    // Clean up tokens for removed network
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_tokensKeyPrefix$networkId');
+    _tokensByNetwork.remove(networkId);
+
+    // If current network was removed, switch to first available
+    if (_currentNetwork?.id == networkId && _networks.isNotEmpty) {
+      await setCurrentNetwork(_networks.first.id);
+    }
+  }
+
+  Future<void> _saveNetworks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = _networks.map((n) => n.toJson()).toList();
+    await prefs.setString(_networksKey, json.encode(jsonList));
+  }
+
+  Future<Network?> getCurrentNetwork() async {
+    if (_currentNetwork != null) return _currentNetwork;
+
+    final prefs = await SharedPreferences.getInstance();
+    final networkId = prefs.getString(_currentNetworkKey);
+
+    await getNetworks(); // Ensure networks are loaded
+
+    if (networkId != null) {
+      _currentNetwork = _networks.firstWhere(
+        (n) => n.id == networkId,
+        orElse: () => _networks.first,
+      );
+    } else if (_networks.isNotEmpty) {
+      _currentNetwork = _networks.first;
+      await prefs.setString(_currentNetworkKey, _currentNetwork!.id);
+    }
+
+    return _currentNetwork;
+  }
+
+  Future<void> setCurrentNetwork(String networkId) async {
+    final network = _networks.firstWhere((n) => n.id == networkId);
+    _currentNetwork = network;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_currentNetworkKey, networkId);
+  }
+
+  // Token management (per network)
+  Future<List<Token>> getTokens() async {
+    final network = await getCurrentNetwork();
+    if (network == null) return [];
+
+    if (_tokensByNetwork.containsKey(network.id)) {
+      return _tokensByNetwork[network.id]!;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString('$_tokensKeyPrefix${network.id}');
+
+    List<Token> tokens;
+    if (jsonString == null) {
+      tokens = [
         Token(symbol: 'ETH', address: _ethAddress, decimals: 18),
       ];
+      _tokensByNetwork[network.id] = tokens;
       await _saveTokens();
     } else {
       final List<dynamic> jsonList = json.decode(jsonString);
-      _tokens = jsonList.map((e) => Token.fromJson(e)).toList();
+      tokens = jsonList.map((e) => Token.fromJson(e)).toList();
+      _tokensByNetwork[network.id] = tokens;
     }
 
-    return _tokens;
+    return tokens;
   }
 
   Future<void> addToken(String address) async {
-    // Check if already added
-    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
+    final network = await getCurrentNetwork();
+    if (network == null) return;
+
+    final tokens = await getTokens();
+
+    if (tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
       return;
     }
 
-    // Fetch token info (symbol, decimals) from blockchain
     final tokenInfo = await _fetchTokenInfo(address);
-    if (tokenInfo == null) return; // handle failure silently
+    if (tokenInfo == null) return;
 
-    _tokens.add(tokenInfo);
+    tokens.add(tokenInfo);
+    _tokensByNetwork[network.id] = tokens;
     await _saveTokens();
   }
 
   Future<void> removeToken(String address) async {
-    _tokens
-        .removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
+    final network = await getCurrentNetwork();
+    if (network == null) return;
+
+    final tokens = await getTokens();
+    tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
+    _tokensByNetwork[network.id] = tokens;
     await _saveTokens();
   }
 
   Future<void> _saveTokens() async {
+    final network = await getCurrentNetwork();
+    if (network == null) return;
+
     final prefs = await SharedPreferences.getInstance();
-    final jsonList = _tokens.map((t) => t.toJson()).toList();
-    await prefs.setString(_tokensKey, json.encode(jsonList));
+    final tokens = _tokensByNetwork[network.id] ?? [];
+    final jsonList = tokens.map((t) => t.toJson()).toList();
+    await prefs.setString('$_tokensKeyPrefix${network.id}', json.encode(jsonList));
   }
 
   Future<Token?> _fetchTokenInfo(String address) async {
     try {
-      final Web3Client client = Web3Client(rpcUrl, Client());
+      final network = await getCurrentNetwork();
+      if (network == null) return null;
+
+      final Web3Client client = Web3Client(network.rpcUrl, Client());
 
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/services/eth_wallet_service.dart';
+import 'package:seed_silo/screens/network_manage_screen.dart';
 
 class TokenManageScreen extends StatefulWidget {
   const TokenManageScreen({super.key});
@@ -14,17 +16,26 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   final _walletService = EthWalletService();
 
   List<Token> _tokens = [];
+  Network? _currentNetwork;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTokens();
+    _loadData();
   }
 
-  Future<void> _loadTokens() async {
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    final network = await _walletService.getCurrentNetwork();
     final tokens = await _walletService.getTokens();
     setState(() {
+      _currentNetwork = network;
       _tokens = tokens;
     });
   }
@@ -52,6 +63,10 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
         const SnackBar(
             content: Text('Token already exists or failed to fetch.')),
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Token added successfully')),
+      );
     }
   }
 
@@ -61,12 +76,54 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
     setState(() => _tokens = tokens);
   }
 
+  Future<void> _navigateToNetworkSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NetworkManageScreen()),
+    );
+    // Reload data after returning from network settings
+    await _loadData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Tokens')),
+      appBar: AppBar(
+        title: const Text('Manage Tokens'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Network Settings',
+            onPressed: _navigateToNetworkSettings,
+          ),
+        ],
+      ),
       body: Column(
         children: [
+          // Network indicator
+          if (_currentNetwork != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              child: Row(
+                children: [
+                  const Icon(Icons.circle, size: 12, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Network: ${_currentNetwork!.name}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.swap_horiz, size: 16),
+                    label: const Text('Switch'),
+                    onPressed: _navigateToNetworkSettings,
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -95,22 +152,26 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
           ),
           const Divider(),
           Expanded(
-            child: ListView.builder(
-              itemCount: _tokens.length,
-              itemBuilder: (context, index) {
-                final token = _tokens[index];
-                return ListTile(
-                  title: Text(token.symbol),
-                  subtitle: Text(token.address),
-                  trailing: token.symbol != 'ETH'
-                      ? IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _removeToken(token),
-                        )
-                      : null,
-                );
-              },
-            ),
+            child: _tokens.isEmpty
+                ? const Center(
+                    child: Text('No tokens added yet'),
+                  )
+                : ListView.builder(
+                    itemCount: _tokens.length,
+                    itemBuilder: (context, index) {
+                      final token = _tokens[index];
+                      return ListTile(
+                        title: Text(token.symbol),
+                        subtitle: Text(token.address),
+                        trailing: token.symbol != 'ETH'
+                            ? IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () => _removeToken(token),
+                              )
+                            : null,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
