@@ -7,15 +7,56 @@ use dotenv::dotenv;
 use std::env;
 use hex;
 
+const PLAINTEXT_LEN: usize = 128;
+const KEY_LEN: usize = 32;
+
+struct KeyInfo {
+    pub private_key: Vec<u8>,
+    pub position: usize
+}
+
+fn load_keys() -> Vec<KeyInfo> {
+    let pairs_str = env::var("PRIVATE_KEYS").expect("PRIVATE_KEYS must be set");
+    let mut pairs = Vec::new();
+
+    for (i,pair_str) in pairs_str.split(';').enumerate() {
+        if pair_str.trim().is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = pair_str.split(',').collect();
+        if parts.len() != 2 {
+            panic!("Invalid PRIVATE_KEYS format at index:{}",i);
+        }
+
+        let private_key_hex = parts[0].trim();
+        let private_key = hex::decode(private_key_hex.trim_start_matches("0x"))
+            .expect(format!("Invalid hex in private key at index:{}",i).as_str());
+
+        if private_key.len() != KEY_LEN {
+            panic!("Invalid private key length: {} at index:{}", private_key.len(),i);
+        }
+
+        let position: usize = parts[1].trim().parse().expect("Invalid position");
+
+        if position + PLAINTEXT_LEN > private_key.len() {
+            panic!("Invalid key position: {} at index:{}", position,i);
+        }
+
+        pairs.push(KeyInfo{private_key, position});
+    }
+
+    pairs
+}
+
 fn main() {
     // Load environment variables from .env file
     dotenv().ok();
 
+    // private keys
+    let private_keys = load_keys();
     // Get the encryption key from the environment
     let encryption_key = env::var("ENCRYPTION_KEY").expect("ENCRYPTION_KEY must be set");
-    // Data to encrypt
-    let private_key = env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
-    let plaintext = hex::decode(private_key).unwrap();
+
 
     // Hash the encryption key using Keccak-256 to derive a 32-byte key
     let mut hasher = Keccak::v256(); // Initialize Keccak-256 hasher
@@ -28,6 +69,16 @@ fn main() {
 
     // Generate a random IV (16 bytes for AES-256-CBC)
     let iv: [u8; 16] = rand::thread_rng().gen();
+
+    // ---- Build 128-byte plaintext buffer ----
+    let mut plaintext = [0u8; PLAINTEXT_LEN];
+    rand::thread_rng().fill(&mut plaintext);
+
+    // Insert private key into the buffer
+    for key_info in &private_keys {
+        plaintext[key_info.position..key_info.position + KEY_LEN]
+            .copy_from_slice(&key_info.private_key);
+    }
 
     // Encrypt the data
     let cipher = Cbc::<Aes256, Pkcs7>::new_from_slices(&key, &iv).unwrap();
