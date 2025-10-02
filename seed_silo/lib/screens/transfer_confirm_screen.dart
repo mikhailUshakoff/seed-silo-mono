@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:seed_silo/services/eth_wallet_service.dart';
+import 'package:seed_silo/services/network_service.dart';
+import 'package:seed_silo/services/wallets/wallet_service_factory.dart';
+import 'package:seed_silo/services/wallets/ethereum_wallet_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:web3dart/web3dart.dart';
@@ -26,11 +28,12 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordPosController =
       TextEditingController(text: '1');
+  final _networkService = NetworkService();
 
   String? _txHash;
   bool _isSubmitting = false;
   Transaction? _transaction;
-  BigInt? _chainId;
+  int? _chainId;
   bool _showTxInfo = false;
   String? _walletAddress;
 
@@ -52,8 +55,24 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     setState(() => _isSubmitting = true);
 
-    final walletAddress = await EthWalletService()
-        .getAddress(Uint8List.fromList(_passwordController.text.codeUnits));
+    // Get current network
+    final network = await _networkService.getCurrentNetwork();
+    if (network == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No network selected')),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    // Get wallet service for current network
+    final walletService = WalletServiceFactory.getWalletService(network);
+
+    // Get wallet address
+    final walletAddress = await walletService.getAddress(
+      Uint8List.fromList(_passwordController.text.codeUnits),
+    );
 
     if (walletAddress == null) {
       _passwordController.text = '';
@@ -61,18 +80,29 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not receive wallet address')),
       );
-
       setState(() => _isSubmitting = false);
       return;
     }
 
     _walletAddress = walletAddress;
 
-    final bTx = await EthWalletService().buildEip1559Transaction(
-      walletAddress,
-      widget.token.address,
-      widget.destination,
-      widget.amount,
+    // Build transaction (Ethereum-specific for now)
+    if (walletService is! EthereumWalletService) {
+      _passwordController.text = '';
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only Ethereum networks are supported')),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
+    final bTx = await walletService.buildTransactionWithRpc(
+      from: walletAddress,
+      to: widget.destination,
+      amount: widget.amount,
+      tokenAddress: widget.token.address,
+      rpcUrl: network.rpcUrl,
     );
 
     if (bTx == null) {
@@ -86,16 +116,18 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     }
 
     if (!mounted) return;
-    _chainId = bTx.$1;
-    _transaction = bTx.$2;
+    _transaction = bTx.$1;
+    _chainId = bTx.$2;
     setState(() {
       _showTxInfo = true;
     });
 
-    final sendResult = await EthWalletService().sendTransaction(
+    // Send transaction
+    final sendResult = await walletService.sendTransactionWithRpc(
       Uint8List.fromList(_passwordController.text.codeUnits),
       _transaction!,
-      _chainId!.toInt(),
+      _chainId!,
+      network.rpcUrl,
     );
     _passwordController.text = '';
     String txHash = sendResult ?? "0x";
@@ -148,11 +180,11 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         Text(
                             'Nonce: 0x${_transaction!.nonce?.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Max Priority Fee Per Gas: 0x${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${EthWalletService().convert2Decimal(_transaction!.maxPriorityFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
+                            'Max Priority Fee Per Gas: 0x${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${EthereumWalletService().convert2Decimal(_transaction!.maxPriorityFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
                         Text(
-                            'Max Fee Per Gas: 0x${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${EthWalletService().convert2Decimal(_transaction!.maxFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
+                            'Max Fee Per Gas: 0x${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${EthereumWalletService().convert2Decimal(_transaction!.maxFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
                         Text(
-                            'Gas limit: 0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? EthWalletService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
+                            'Gas limit: 0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? EthereumWalletService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
                         Text('------------'),
                         Text('To: ${_transaction!.to?.hex ?? "null"}'),
                         Text(
@@ -160,7 +192,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         Text(
                             'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
                         Text(
-                            'Decoded Data:\n${_transaction!.data != null ? EthWalletService().decodeTransactionData(_transaction!.data, widget.token.decimals) : "null"}'),
+                            'Decoded Data:\n${_transaction!.data != null ? EthereumWalletService().decodeTransactionData(_transaction!.data, widget.token.decimals) : "null"}'),
                       ],
                     )
                   : const SizedBox.shrink(),

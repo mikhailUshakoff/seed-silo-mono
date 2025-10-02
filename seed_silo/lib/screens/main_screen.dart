@@ -4,7 +4,8 @@ import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/screens/transfer_screen.dart';
 import 'package:seed_silo/screens/token_manage_screen.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
-import 'package:seed_silo/services/eth_wallet_service.dart';
+import 'package:seed_silo/services/network_service.dart';
+import 'package:seed_silo/services/token_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -14,7 +15,8 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  final _walletService = EthWalletService();
+  final _networkService = NetworkService();
+  final _tokenService = TokenService();
 
   List<Token> _tokens = [];
   Network? _currentNetwork;
@@ -29,8 +31,8 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    final network = await _walletService.getCurrentNetwork();
-    final tokens = await _walletService.getTokens();
+    final network = await _networkService.getCurrentNetwork();
+    final tokens = await _tokenService.getTokens();
 
     if (!mounted) return;
 
@@ -207,7 +209,7 @@ class _NetworkSelectorSheet extends StatefulWidget {
 }
 
 class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
-  final _walletService = EthWalletService();
+  final _networkService = NetworkService();
   List<Network> _networks = [];
   bool _isLoading = true;
 
@@ -218,7 +220,7 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
   }
 
   Future<void> _loadNetworks() async {
-    final networks = await _walletService.getNetworks();
+    final networks = await _networkService.getNetworks();
     if (!mounted) return;
     setState(() {
       _networks = networks;
@@ -227,7 +229,7 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
   }
 
   Future<void> _switchNetwork(Network network) async {
-    await _walletService.setCurrentNetwork(network.id);
+    await _networkService.setCurrentNetwork(network.id);
     widget.onNetworkChanged();
   }
 

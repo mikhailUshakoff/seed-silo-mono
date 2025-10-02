@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seed_silo/models/network.dart';
-import 'package:seed_silo/services/eth_wallet_service.dart';
+import 'package:seed_silo/services/network_service.dart';
+import 'package:seed_silo/services/token_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -14,7 +15,8 @@ class NetworkManageScreen extends StatefulWidget {
 
 class _NetworkManageScreenState extends State<NetworkManageScreen> {
   final _rpcUrlController = TextEditingController();
-  final _walletService = EthWalletService();
+  final _networkService = NetworkService();
+  final _tokenService = TokenService();
 
   List<Network> _networks = [];
   Network? _currentNetwork;
@@ -33,8 +35,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
   }
 
   Future<void> _loadNetworks() async {
-    final networks = await _walletService.getNetworks();
-    final current = await _walletService.getCurrentNetwork();
+    final networks = await _networkService.getNetworks();
+    final current = await _networkService.getCurrentNetwork();
     setState(() {
       _networks = networks;
       _currentNetwork = current;
@@ -78,7 +80,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
         chainId: chainId,
       );
 
-      await _walletService.addNetwork(network);
+      await _networkService.addNetwork(network);
       await _loadNetworks();
 
       if (!mounted) return;
@@ -124,7 +126,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
   }
 
   Future<void> _switchNetwork(Network network) async {
-    await _walletService.setCurrentNetwork(network.id);
+    await _networkService.setCurrentNetwork(network.id);
     await _loadNetworks();
 
     if (!mounted) return;
@@ -156,7 +158,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
     );
 
     if (confirm == true) {
-      await _walletService.removeNetwork(network.id);
+      await _networkService.removeNetwork(network.id);
+      await _tokenService.removeTokensForNetwork(network.id);
       await _loadNetworks();
 
       if (!mounted) return;
