@@ -1,8 +1,7 @@
 enum NetworkType {
-  ethereum('Ethereum', 'EVM-compatible networks'),
-  bitcoin('Bitcoin', 'Bitcoin and forks'),
-  solana('Solana', 'Solana network'),
-  cosmos('Cosmos', 'Cosmos SDK chains');
+  ethereum('Ethereum', 'EVM-compatible networks');
+  // bitcoin('Bitcoin', 'Bitcoin and forks'),
+  // solana('Solana', 'Solana network'),
 
   final String displayName;
   final String description;

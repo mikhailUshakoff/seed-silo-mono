@@ -5,7 +5,6 @@ import 'package:seed_silo/screens/transfer_screen.dart';
 import 'package:seed_silo/screens/token_manage_screen.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
 import 'package:seed_silo/services/network_service.dart';
-import 'package:seed_silo/services/token_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,7 +15,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final _networkService = NetworkService();
-  final _tokenService = TokenService();
 
   List<Token> _tokens = [];
   Network? _currentNetwork;
@@ -32,7 +30,8 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _isLoading = true);
 
     final network = await _networkService.getCurrentNetwork();
-    final tokens = await _tokenService.getTokens();
+    final wallet = await _networkService.getCurrentWallet();
+    final tokens = wallet != null ? await wallet.getTokens() : <Token>[];
 
     if (!mounted) return;
 

@@ -2,7 +2,7 @@ import 'package:convert/convert.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
-import 'package:seed_silo/services/token_service.dart';
+import 'package:seed_silo/services/erc20_token_service.dart';
 import 'package:seed_silo/services/wallets/base_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/crypto.dart';
@@ -10,14 +10,30 @@ import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart';
 
 /// Ethereum/EVM-compatible wallet implementation
-class EthereumWalletService extends BaseWalletService {
-  static final EthereumWalletService _instance = EthereumWalletService._internal();
-  factory EthereumWalletService() => _instance;
-  EthereumWalletService._internal();
+class EthereumWallet extends BaseWalletService {
+  static final EthereumWallet _instance = EthereumWallet._internal();
+  factory EthereumWallet() => _instance;
+  EthereumWallet._internal();
 
   final _hardwareWalletService = HardwareWalletService();
+  late final Erc20TokenService _tokenService = Erc20TokenService(this);
 
   static const String _nativeTokenAddress = '0x0000000000000000000000000000000000000000';
+
+  @override
+  String? rpcUrl;
+
+  @override
+  String? networkId;
+
+  @override
+  Token getDefaultNativeToken() {
+    return Token(
+      symbol: 'ETH',
+      address: _nativeTokenAddress,
+      decimals: 18,
+    );
+  }
 
   @override
   bool isNativeToken(String tokenAddress) =>
@@ -39,19 +55,24 @@ class EthereumWalletService extends BaseWalletService {
     return publicKey == null ? null : getAddressFromPublicKey(publicKey);
   }
 
+  // Token management methods (delegated to Erc20TokenService)
+  @override
+  Future<List<Token>> getTokens() => _tokenService.getTokens();
+
+  @override
+  Future<bool> addToken(String address) => _tokenService.addToken(address);
+
+  @override
+  Future<void> removeToken(String address) => _tokenService.removeToken(address);
+
+  @override
+  void clearTokenCache() => _tokenService.clearCache();
+
   @override
   Future<BigInt> getBalance(String walletAddress, String tokenAddress) async {
-    // This method needs rpcUrl - should be passed from higher level
-    // For now, we'll throw an error
-    throw UnimplementedError('Use getBalanceWithRpc instead');
-  }
+    if (rpcUrl == null) return BigInt.zero;
 
-  Future<BigInt> getBalanceWithRpc(
-    String walletAddress,
-    String tokenAddress,
-    String rpcUrl,
-  ) async {
-    final client = Web3Client(rpcUrl, Client());
+    final client = Web3Client(rpcUrl!, Client());
     final wallet = EthereumAddress.fromHex(walletAddress);
 
     try {
@@ -61,7 +82,7 @@ class EthereumWalletService extends BaseWalletService {
       } else {
         final token = EthereumAddress.fromHex(tokenAddress);
         final contract = DeployedContract(
-          ContractAbi.fromJson(TokenService.erc20Abi, 'ERC20'),
+          ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
           token,
         );
 
@@ -87,7 +108,23 @@ class EthereumWalletService extends BaseWalletService {
     required String tokenAddress,
     FeeLevel feeLevel = FeeLevel.medium,
   }) async {
-    throw UnimplementedError('Use buildTransactionWithRpc instead');
+    if (rpcUrl == null) return null;
+
+    final txData = await buildTransactionWithRpc(
+      from: from,
+      to: to,
+      amount: amount,
+      tokenAddress: tokenAddress,
+      rpcUrl: rpcUrl!,
+      feeLevel: feeLevel,
+    );
+
+    if (txData == null) return null;
+
+    return TransactionData(
+      rawTransaction: txData.$1,
+      chainId: txData.$2,
+    );
   }
 
   Future<(Transaction, int)?> buildTransactionWithRpc({
@@ -129,7 +166,7 @@ class EthereumWalletService extends BaseWalletService {
     } else {
       final token = EthereumAddress.fromHex(tokenAddress);
       final contract = DeployedContract(
-        ContractAbi.fromJson(TokenService.erc20Abi, 'ERC20'),
+        ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
         token,
       );
 
@@ -170,7 +207,14 @@ class EthereumWalletService extends BaseWalletService {
     Uint8List textPassword,
     TransactionData transaction,
   ) async {
-    throw UnimplementedError('Use sendTransactionWithRpc instead');
+    if (rpcUrl == null) return null;
+
+    return await sendTransactionWithRpc(
+      textPassword,
+      transaction.rawTransaction as Transaction,
+      transaction.chainId,
+      rpcUrl!,
+    );
   }
 
   Future<String?> sendTransactionWithRpc(
@@ -243,7 +287,7 @@ class EthereumWalletService extends BaseWalletService {
     if (data == null || data.isEmpty) return null;
 
     final contract = DeployedContract(
-      ContractAbi.fromJson(TokenService.erc20Abi, 'ERC20'),
+      ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
       EthereumAddress.fromHex(_nativeTokenAddress),
     );
 
@@ -306,13 +350,15 @@ class EthereumWalletService extends BaseWalletService {
   }
 
   @override
-  Future<Token?> fetchTokenInfo(String address, String rpcUrl) async {
+  Future<Token?> fetchTokenInfo(String address) async {
+    if (rpcUrl == null) return null;
+
     try {
-      final client = Web3Client(rpcUrl, Client());
+      final client = Web3Client(rpcUrl!, Client());
       final tokenAddress = EthereumAddress.fromHex(address);
 
       final contract = DeployedContract(
-        ContractAbi.fromJson(TokenService.erc20Abi, 'ERC20'),
+        ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
         tokenAddress,
       );
 

@@ -1,11 +1,11 @@
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/models/network_type.dart';
 import 'package:seed_silo/services/wallets/base_wallet_service.dart';
-import 'package:seed_silo/services/wallets/ethereum_wallet_service.dart';
+import 'package:seed_silo/services/wallets/ethereum_wallet.dart';
 // Import future implementations:
-// import 'package:seed_silo/services/wallets/bitcoin_wallet_service.dart';
-// import 'package:seed_silo/services/wallets/solana_wallet_service.dart';
-// import 'package:seed_silo/services/wallets/cosmos_wallet_service.dart';
+// import 'package:seed_silo/services/wallets/bitcoin_wallet.dart';
+// import 'package:seed_silo/services/wallets/solana_wallet.dart';
+// import 'package:seed_silo/services/wallets/cosmos_wallet.dart';
 
 /// Factory to create the appropriate wallet service based on network type
 class WalletServiceFactory {
@@ -13,29 +13,29 @@ class WalletServiceFactory {
 
   /// Get wallet service for a specific network
   static BaseWalletService getWalletService(Network network) {
-    // Return cached instance if exists
-    if (_instances.containsKey(network.type)) {
-      return _instances[network.type]!;
-    }
-
-    // Create new instance based on network type
+    // Get or create instance for this network type
     BaseWalletService service;
-    switch (network.type) {
-      case NetworkType.ethereum:
-        service = EthereumWalletService();
-        break;
-      case NetworkType.bitcoin:
-        // service = BitcoinWalletService();
-        throw UnimplementedError('Bitcoin support coming soon');
-      case NetworkType.solana:
-        // service = SolanaWalletService();
-        throw UnimplementedError('Solana support coming soon');
-      case NetworkType.cosmos:
-        // service = CosmosWalletService();
-        throw UnimplementedError('Cosmos support coming soon');
+
+    if (_instances.containsKey(network.type)) {
+      service = _instances[network.type]!;
+    } else {
+      // Create new instance based on network type
+      switch (network.type) {
+        case NetworkType.ethereum:
+          service = EthereumWallet();
+          break;
+      }
+
+      _instances[network.type] = service;
     }
 
-    _instances[network.type] = service;
+    // Set network context
+    service.rpcUrl = network.rpcUrl;
+    service.networkId = network.id;
+
+    // Clear token cache when switching networks
+    service.clearTokenCache();
+
     return service;
   }
 

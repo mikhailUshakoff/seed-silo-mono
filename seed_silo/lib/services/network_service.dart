@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/network.dart';
+import 'package:seed_silo/services/wallets/base_wallet_service.dart';
+import 'package:seed_silo/services/wallets/wallet_service_factory.dart';
 
 class NetworkService {
   static final NetworkService _instance = NetworkService._internal();
@@ -12,6 +14,7 @@ class NetworkService {
 
   List<Network> _networks = [];
   Network? _currentNetwork;
+  BaseWalletService? _currentWalletService;
 
   /// Get all configured networks
   Future<List<Network>> getNetworks() async {
@@ -54,12 +57,16 @@ class NetworkService {
     await _saveNetworks();
 
     // If current network was removed, switch to first available
-    if (_currentNetwork?.id == networkId && _networks.isNotEmpty) {
-      await setCurrentNetwork(_networks.first.id);
-    } else if (_networks.isEmpty) {
+    if (_currentNetwork?.id == networkId) {
       _currentNetwork = null;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_currentNetworkKey);
+      _currentWalletService = null;
+
+      if (_networks.isNotEmpty) {
+        await setCurrentNetwork(_networks.first.id);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_currentNetworkKey);
+      }
     }
   }
 
@@ -85,10 +92,22 @@ class NetworkService {
     return _currentNetwork;
   }
 
+  /// Get the wallet service for the current network
+  Future<BaseWalletService?> getCurrentWallet() async {
+    if (_currentWalletService != null) return _currentWalletService;
+
+    final network = await getCurrentNetwork();
+    if (network == null) return null;
+
+    _currentWalletService = WalletServiceFactory.getWalletService(network);
+    return _currentWalletService;
+  }
+
   /// Set the active network
   Future<void> setCurrentNetwork(String networkId) async {
     final network = _networks.firstWhere((n) => n.id == networkId);
     _currentNetwork = network;
+    _currentWalletService = WalletServiceFactory.getWalletService(network);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currentNetworkKey, networkId);
@@ -110,5 +129,6 @@ class NetworkService {
   void clearCache() {
     _networks.clear();
     _currentNetwork = null;
+    _currentWalletService = null;
   }
 }

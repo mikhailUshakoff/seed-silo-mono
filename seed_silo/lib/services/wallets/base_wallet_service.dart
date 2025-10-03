@@ -3,11 +3,28 @@ import 'package:seed_silo/models/token.dart';
 
 /// Abstract base class for all blockchain wallet implementations
 abstract class BaseWalletService {
+  /// Get the RPC URL (set by network context)
+  String? get rpcUrl;
+  set rpcUrl(String? url);
+
+  /// Get the network ID (set by network context)
+  String? get networkId;
+  set networkId(String? id);
+
   /// Get wallet address from password
   Future<String?> getAddress(Uint8List textPassword);
 
   /// Get address from public key
   String getAddressFromPublicKey(Uint8List publicKey);
+
+  /// Get tokens for this wallet's network
+  Future<List<Token>> getTokens();
+
+  /// Add a token to this wallet's network
+  Future<bool> addToken(String address);
+
+  /// Remove a token from this wallet's network
+  Future<void> removeToken(String address);
 
   /// Get token balance for a wallet
   Future<BigInt> getBalance(String walletAddress, String tokenAddress);
@@ -34,10 +51,16 @@ abstract class BaseWalletService {
   String convert2Decimal(BigInt value, int decimals);
 
   /// Fetch token information from blockchain
-  Future<Token?> fetchTokenInfo(String address, String rpcUrl);
+  Future<Token?> fetchTokenInfo(String address);
 
   /// Check if token is native (e.g., ETH, BTC, SOL)
   bool isNativeToken(String tokenAddress);
+
+  /// Get default native token for this blockchain
+  Token getDefaultNativeToken();
+
+  /// Clear token cache (called when switching networks)
+  void clearTokenCache();
 }
 
 /// Transaction data structure that all implementations should use
