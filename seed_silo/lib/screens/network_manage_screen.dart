@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/services/network_service.dart';
-import 'package:seed_silo/services/erc20_token_service.dart';
+import 'package:seed_silo/services/token_service.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -158,7 +158,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
 
     if (confirm == true) {
       await _networkService.removeNetwork(network.id);
-      await Erc20TokenService.removeTokensForNetwork(network.id);
+      await TokenService.removeTokensForNetwork(network.id);
       await _loadNetworks();
 
       if (!mounted) return;

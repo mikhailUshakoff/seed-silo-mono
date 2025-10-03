@@ -2,7 +2,7 @@ import 'package:convert/convert.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
-import 'package:seed_silo/services/erc20_token_service.dart';
+import 'package:seed_silo/services/token_service.dart';
 import 'package:seed_silo/services/wallets/base_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/crypto.dart';
@@ -16,9 +16,22 @@ class EthereumWallet extends BaseWalletService {
   EthereumWallet._internal();
 
   final _hardwareWalletService = HardwareWalletService();
-  late final Erc20TokenService _tokenService = Erc20TokenService(this);
 
-  static const String _nativeTokenAddress = '0x0000000000000000000000000000000000000000';
+  static const String _nativeTokenAddress = 'native';
+
+
+  // ERC20 ABI for Ethereum-based tokens
+  static const String erc20Abi = '''
+      [
+        {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
+        {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},
+        {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},
+        {"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
+      ]
+    ''';
+
+  // Token cache per network
+  List<Token>? _cachedTokens;
 
   @override
   String? rpcUrl;
@@ -55,18 +68,70 @@ class EthereumWallet extends BaseWalletService {
     return publicKey == null ? null : getAddressFromPublicKey(publicKey);
   }
 
-  // Token management methods (delegated to Erc20TokenService)
+  // Token management methods
   @override
-  Future<List<Token>> getTokens() => _tokenService.getTokens();
+  Future<List<Token>> getTokens() async {
+    if (_cachedTokens != null) return _cachedTokens!;
+
+    final currentNetworkId = networkId;
+    if (currentNetworkId == null) return [];
+
+    final tokens = <Token>[getDefaultNativeToken()];
+    final tokenAddresses = await TokenService.getTokenKeysForNetwork(currentNetworkId);
+
+    for (final address in tokenAddresses) {
+      final token = await TokenService.loadTokenForNetwork(currentNetworkId, address);
+      if (token != null) {
+        tokens.add(token);
+      }
+    }
+
+    _cachedTokens = tokens;
+    return _cachedTokens!;
+  }
 
   @override
-  Future<bool> addToken(String address) => _tokenService.addToken(address);
+  Future<bool> addToken(String address) async {
+    final tokens = await getTokens();
+
+    // Check if already exists
+    if (tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
+      return false;
+    }
+
+    // Fetch token info from blockchain
+    final tokenInfo = await fetchTokenInfo(address);
+    if (tokenInfo == null) return false;
+
+    // Save individual token
+    final currentNetworkId = networkId;
+    if (currentNetworkId != null) {
+      await TokenService.saveTokenForNetwork(currentNetworkId, address, tokenInfo);
+    }
+
+    tokens.add(tokenInfo);
+    _cachedTokens = tokens;
+    return true;
+  }
 
   @override
-  Future<void> removeToken(String address) => _tokenService.removeToken(address);
+  Future<void> removeToken(String address) async {
+    final tokens = await getTokens();
+    tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
+
+    // Remove individual token
+    final currentNetworkId = networkId;
+    if (currentNetworkId != null) {
+      await TokenService.removeTokenForNetwork(currentNetworkId, address);
+    }
+
+    _cachedTokens = tokens;
+  }
 
   @override
-  void clearTokenCache() => _tokenService.clearCache();
+  void clearTokenCache() {
+    _cachedTokens = null;
+  }
 
   @override
   Future<BigInt> getBalance(String walletAddress, String tokenAddress) async {
@@ -82,7 +147,7 @@ class EthereumWallet extends BaseWalletService {
       } else {
         final token = EthereumAddress.fromHex(tokenAddress);
         final contract = DeployedContract(
-          ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
+          ContractAbi.fromJson(erc20Abi, 'ERC20'),
           token,
         );
 
@@ -166,7 +231,7 @@ class EthereumWallet extends BaseWalletService {
     } else {
       final token = EthereumAddress.fromHex(tokenAddress);
       final contract = DeployedContract(
-        ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
+        ContractAbi.fromJson(erc20Abi, 'ERC20'),
         token,
       );
 
@@ -287,7 +352,7 @@ class EthereumWallet extends BaseWalletService {
     if (data == null || data.isEmpty) return null;
 
     final contract = DeployedContract(
-      ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
+      ContractAbi.fromJson(erc20Abi, 'ERC20'),
       EthereumAddress.fromHex(_nativeTokenAddress),
     );
 
@@ -358,7 +423,7 @@ class EthereumWallet extends BaseWalletService {
       final tokenAddress = EthereumAddress.fromHex(address);
 
       final contract = DeployedContract(
-        ContractAbi.fromJson(Erc20TokenService.erc20Abi, 'ERC20'),
+        ContractAbi.fromJson(erc20Abi, 'ERC20'),
         tokenAddress,
       );
 
