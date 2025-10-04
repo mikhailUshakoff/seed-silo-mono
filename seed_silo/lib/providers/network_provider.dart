@@ -7,7 +7,7 @@ class NetworkProvider extends ChangeNotifier {
   final NetworkService _networkService = NetworkService();
 
   List<Network> _networks = [];
-  Network? _currentNetwork;
+  late Network _currentNetwork;
   bool _isLoading = false;
 
   List<Network> get networks => _networks;
@@ -41,19 +41,13 @@ class NetworkProvider extends ChangeNotifier {
 
   /// Remove a network by ID
   Future<void> removeNetwork(int networkId) async {
+    // No-op if trying to remove the current network
+    if (_currentNetwork.chainId == networkId) {
+      return;
+    }
+
     _networks.removeWhere((n) => n.chainId == networkId);
     await _networkService.saveNetworks(_networks);
-
-    // If current network was removed, switch to first available
-    if (_currentNetwork?.chainId == networkId) {
-      _currentNetwork = null;
-
-      if (_networks.isNotEmpty) {
-        await setCurrentNetwork(_networks.first.chainId);
-      } else {
-        await _networkService.clearCurrentNetwork();
-      }
-    }
 
     // Remove tokens for this network
     await TokenService.removeTokensForNetwork(networkId);
@@ -81,7 +75,6 @@ class NetworkProvider extends ChangeNotifier {
   /// Clear all state (useful for testing or logout)
   void clearCache() {
     _networks.clear();
-    _currentNetwork = null;
     notifyListeners();
   }
 }

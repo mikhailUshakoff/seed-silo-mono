@@ -27,8 +27,7 @@ class TokenService {
     // Get current network from provider context if available
     // For now, fallback to direct service call
     final network = await NetworkService().getCurrentNetwork();
-    final networkId = network?.chainId;
-    if (networkId == null) return [];
+    final networkId = network.chainId;
 
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString('$_tokensKeyPrefix$networkId');
