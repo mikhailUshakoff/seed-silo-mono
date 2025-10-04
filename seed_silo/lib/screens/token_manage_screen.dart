@@ -32,7 +32,7 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _loadData() async {
-    final tokens = await TokenService().getTokens();
+    final tokens = await TokenService().getTokens(widget.currentNetwork.chainId);
 
     setState(() {
       _tokens = tokens;
@@ -46,8 +46,8 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
     setState(() => _isLoading = true);
 
     final beforeCount = _tokens.length;
-    final success = await TokenService().addToken(address);
-    final tokens = await TokenService().getTokens();
+    final success = await TokenService().addToken(widget.currentNetwork,address);
+    final tokens = await TokenService().getTokens(widget.currentNetwork.chainId);
 
     if (!mounted) return;
 
@@ -70,8 +70,8 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _removeToken(Token token) async {
-    await TokenService().removeToken(token.address);
-    final tokens = await TokenService().getTokens();
+    await TokenService().removeToken(widget.currentNetwork.chainId, token.address);
+    final tokens = await TokenService().getTokens(widget.currentNetwork.chainId);
     setState(() => _tokens = tokens);
   }
 

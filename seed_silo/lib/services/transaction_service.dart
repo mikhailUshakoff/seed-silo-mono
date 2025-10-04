@@ -307,14 +307,6 @@ final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     }
   }
 
-  Future<List<Token>> getTokens() async {
-    if (_tokens.isNotEmpty) return _tokens;
-
-    _tokens = await TokenService().getTokens();
-
-    return _tokens;
-  }
-
   Future<bool> addToken(String address) async {
     // Check if already added
     if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {

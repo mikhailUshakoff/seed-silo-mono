@@ -28,7 +28,9 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    final tokens = await TokenService().getTokens();
+    final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
+    final currentNetwork = networkProvider.currentNetwork;
+    final tokens = await TokenService().getTokens(currentNetwork.chainId);
 
     if (!mounted) return;
 

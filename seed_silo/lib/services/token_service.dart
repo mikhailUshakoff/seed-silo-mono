@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'package:seed_silo/models/network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
 
-import 'network_service.dart';
-import 'transaction_service.dart';
+import 'package:web3dart/web3dart.dart';
+import 'package:http/http.dart';
 
 class TokenService {
   static const String _tokensKeyPrefix = 'tokens_';
@@ -21,13 +22,8 @@ class TokenService {
   List<Token>? _cachedTokens;
 
   /// Get tokens for the current wallet's network
-  Future<List<Token>> getTokens() async {
+  Future<List<Token>> getTokens(int networkId) async {
     if (_cachedTokens != null) return _cachedTokens!;
-
-    // Get current network from provider context if available
-    // For now, fallback to direct service call
-    final network = await NetworkService().getCurrentNetwork();
-    final networkId = network.chainId;
 
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString('$_tokensKeyPrefix$networkId');
@@ -36,26 +32,21 @@ class TokenService {
     if (jsonString == null) {
       // Default native token
       tokens = [
-        Token(
-          address: TransactionService.ethAddress,
-          symbol: 'ETH',
-          decimals: 18,
-        ),
+        defaultNativeToken,
       ];
-      _cachedTokens = tokens;
-      await _saveTokens();
+      await _saveTokens(networkId);
     } else {
       final List<dynamic> jsonList = json.decode(jsonString);
       tokens = jsonList.map((e) => Token.fromJson(e)).toList();
-      _cachedTokens = tokens;
     }
 
+    _cachedTokens = tokens;
     return tokens;
   }
 
   /// Add a token to the current network
-  Future<bool> addToken(String address) async {
-    final tokens = await getTokens();
+  Future<bool> addToken(Network network, String address) async {
+    final tokens = await getTokens(network.chainId);
 
     // Check if already exists
     if (tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
@@ -63,28 +54,25 @@ class TokenService {
     }
 
     // Fetch token info from blockchain
-    final tokenInfo = await TransactionService().fetchTokenInfo(address);
+    final tokenInfo = await fetchTokenInfo(network.rpcUrl, address);
     if (tokenInfo == null) return false;
 
     tokens.add(tokenInfo);
     _cachedTokens = tokens;
-    await _saveTokens();
+    await _saveTokens(network.chainId);
     return true;
   }
 
   /// Remove a token from the current network
-  Future<void> removeToken(String address) async {
-    final tokens = await getTokens();
+  Future<void> removeToken(int networkId, String address) async {
+    final tokens = await getTokens(networkId);
     tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
     _cachedTokens = tokens;
-    await _saveTokens();
+    await _saveTokens(networkId);
   }
 
   /// Save tokens for current network
-  Future<void> _saveTokens() async {
-    final network = await(NetworkService().getCurrentNetwork());
-    final networkId = network.chainId;
-
+  Future<void> _saveTokens(int networkId) async {
     final prefs = await SharedPreferences.getInstance();
     final tokens = _cachedTokens ?? [];
     final jsonList = tokens.map((t) => t.toJson()).toList();
@@ -101,4 +89,40 @@ class TokenService {
   void clearCache() {
     _cachedTokens = null;
   }
+
+    Future<Token?> fetchTokenInfo(String rpcUrl, String address) async {
+    try {
+      final Web3Client client = Web3Client(rpcUrl, Client());
+
+      final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
+
+      final DeployedContract contract = DeployedContract(
+        ContractAbi.fromJson(erc20Abi, 'ERC20'),
+        tokenAddress,
+      );
+
+      final symbolFunction = contract.function('symbol');
+      final decimalsFunction = contract.function('decimals');
+
+      final symbolResult = await client.call(
+        contract: contract,
+        function: symbolFunction,
+        params: [],
+      );
+
+      final decimalsResult = await client.call(
+        contract: contract,
+        function: decimalsFunction,
+        params: [],
+      );
+
+      final String symbol = symbolResult.first as String;
+      final int decimals = decimalsResult.first.toInt();
+
+      return Token(symbol: symbol, address: address, decimals: decimals);
+    } catch (e) {
+      return null;
+    }
+  }
+
 }
