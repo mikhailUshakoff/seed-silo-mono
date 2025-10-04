@@ -83,8 +83,7 @@ class TokenService {
   /// Save tokens for current network
   Future<void> _saveTokens() async {
     final network = await(NetworkService().getCurrentNetwork());
-    final networkId = network?.chainId;
-    if (networkId == null) return;
+    final networkId = network.chainId;
 
     final prefs = await SharedPreferences.getInstance();
     final tokens = _cachedTokens ?? [];

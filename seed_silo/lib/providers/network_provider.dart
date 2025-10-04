@@ -11,7 +11,7 @@ class NetworkProvider extends ChangeNotifier {
   bool _isLoading = false;
 
   List<Network> get networks => _networks;
-  Network? get currentNetwork => _currentNetwork;
+  Network get currentNetwork => _currentNetwork;
   bool get isLoading => _isLoading;
 
   /// Initialize the provider by loading networks

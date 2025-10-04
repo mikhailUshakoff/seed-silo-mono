@@ -180,7 +180,7 @@ class TransactionService {
     // tx is EIP1559 add prefix 0x02
     tx2Send = prependTransactionType(0x02, tx2Send);
 
-final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
+final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     final Web3Client client = Web3Client(rpcUrl, Client());
     String sendTxHash = await client.sendRawTransaction(tx2Send);
 
@@ -200,7 +200,7 @@ final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
 
   Future<BigInt> getBalance(String wallet, String token) async {
     final httpClient = http.Client();
-    final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
+    final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(wallet);
     if (isEthToken(token)) {
@@ -235,7 +235,7 @@ final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
     RewardPercentile rewardPercentile = RewardPercentile.low,
   }) async {
     final httpClient = http.Client();
-    final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
+    final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
     final sender = EthereumAddress.fromHex(from);
@@ -344,7 +344,7 @@ final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
 
   Future<Token?> fetchTokenInfo(String address) async {
     try {
-      final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
+      final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
       final Web3Client client = Web3Client(rpcUrl, Client());
 
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);

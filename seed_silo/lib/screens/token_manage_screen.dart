@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/models/network.dart';
-import 'package:seed_silo/services/network_service.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
 import 'package:seed_silo/services/token_service.dart';
 
 class TokenManageScreen extends StatefulWidget {
-  const TokenManageScreen({super.key});
+  final Network currentNetwork;
+
+  const TokenManageScreen({super.key, required this.currentNetwork});
 
   @override
   State<TokenManageScreen> createState() => _TokenManageScreenState();
@@ -14,10 +15,8 @@ class TokenManageScreen extends StatefulWidget {
 
 class _TokenManageScreenState extends State<TokenManageScreen> {
   final _addressController = TextEditingController();
-  final _networkService = NetworkService();
 
   List<Token> _tokens = [];
-  Network? _currentNetwork;
   bool _isLoading = false;
 
   @override
@@ -33,11 +32,9 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _loadData() async {
-    final network = await _networkService.getCurrentNetwork();
     final tokens = await TokenService().getTokens();
 
     setState(() {
-      _currentNetwork = network;
       _tokens = tokens;
     });
   }
@@ -83,8 +80,10 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
       context,
       MaterialPageRoute(builder: (context) => const NetworkManageScreen()),
     );
-    // Reload data after returning from network settings
-    await _loadData();
+    // Pop back to parent to refresh with new network
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -103,29 +102,28 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
       body: Column(
         children: [
           // Network indicator
-          if (_currentNetwork != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              child: Row(
-                children: [
-                  const Icon(Icons.circle, size: 12, color: Colors.green),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Network: ${_currentNetwork!.name}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            color: Theme.of(context).primaryColor.withOpacity(0.1),
+            child: Row(
+              children: [
+                const Icon(Icons.circle, size: 12, color: Colors.green),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Network: ${widget.currentNetwork.name}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.swap_horiz, size: 16),
-                    label: const Text('Switch'),
-                    onPressed: _navigateToNetworkSettings,
-                  ),
-                ],
-              ),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.swap_horiz, size: 16),
+                  label: const Text('Switch'),
+                  onPressed: _navigateToNetworkSettings,
+                ),
+              ],
             ),
+          ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(

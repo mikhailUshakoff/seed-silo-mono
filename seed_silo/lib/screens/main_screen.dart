@@ -38,9 +38,9 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _navigateToManageTokens() async {
+  void _navigateToManageTokens(Network currentNetwork) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const TokenManageScreen()),
+      MaterialPageRoute(builder: (_) => TokenManageScreen(currentNetwork: currentNetwork)),
     );
     await _loadData(); // Reload after returning
   }
@@ -83,7 +83,6 @@ class _MainScreenState extends State<MainScreen> {
             title: Row(
               children: [
                 const Text('Tokens'),
-                if (currentNetwork != null) ...[
                   const SizedBox(width: 8),
                   const Text('•', style: TextStyle(fontSize: 20)),
                   const SizedBox(width: 8),
@@ -119,14 +118,13 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ),
                   ),
-                ],
               ],
             ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.settings),
                 tooltip: 'Manage Tokens',
-                onPressed: _navigateToManageTokens,
+                onPressed: () => _navigateToManageTokens(currentNetwork),
               ),
               const SizedBox(width: 8),
             ],
@@ -148,7 +146,7 @@ class _MainScreenState extends State<MainScreen> {
                           TextButton.icon(
                             icon: const Icon(Icons.add),
                             label: const Text('Add Token'),
-                            onPressed: _navigateToManageTokens,
+                            onPressed: () => _navigateToManageTokens(currentNetwork),
                           ),
                         ],
                       ),
