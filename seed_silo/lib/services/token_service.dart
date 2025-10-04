@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
 
 import 'network_service.dart';
-import 'wallet_service.dart';
+import 'transaction_service.dart';
 
 class TokenService {
   static const String _tokensKeyPrefix = 'tokens_';
@@ -38,7 +38,7 @@ class TokenService {
       // Default native token
       tokens = [
         Token(
-          address: WalletService.ethAddress,
+          address: TransactionService.ethAddress,
           symbol: 'ETH',
           decimals: 18,
         ),
@@ -64,7 +64,7 @@ class TokenService {
     }
 
     // Fetch token info from blockchain
-    final tokenInfo = await WalletService().fetchTokenInfo(address);
+    final tokenInfo = await TransactionService().fetchTokenInfo(address);
     if (tokenInfo == null) return false;
 
     tokens.add(tokenInfo);

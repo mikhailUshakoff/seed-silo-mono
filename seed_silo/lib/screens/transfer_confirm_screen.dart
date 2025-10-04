@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:seed_silo/services/network_service.dart';
-import 'package:seed_silo/services/wallet_service.dart';
+import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:web3dart/web3dart.dart';
@@ -27,7 +26,6 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordPosController =
       TextEditingController(text: '1');
-  final _networkService = NetworkService();
 
   String? _txHash;
   bool _isSubmitting = false;
@@ -54,19 +52,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Get current wallet
-    final wallet = await _networkService.getCurrentWallet();
-    if (wallet == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No wallet available')),
-      );
-      setState(() => _isSubmitting = false);
-      return;
-    }
-
     // Get wallet address
-    final walletAddress = await wallet.getAddress(
+    final walletAddress = await TransactionService().getAddress(
       Uint8List.fromList(_passwordController.text.codeUnits),
     );
 
@@ -82,7 +69,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     _walletAddress = walletAddress;
 
-    final bTx = await WalletService().buildEip1559Transaction(
+    final bTx = await TransactionService().buildEip1559Transaction(
       walletAddress,
       widget.token.address,
       widget.destination,
@@ -106,7 +93,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
       _showTxInfo = true;
     });
 
-    final sendResult = await WalletService().sendTransaction(
+    final sendResult = await TransactionService().sendTransaction(
       Uint8List.fromList(_passwordController.text.codeUnits),
       _transaction!,
       _chainId!.toInt(),
@@ -162,11 +149,11 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         Text(
                             'Nonce: 0x${_transaction!.nonce?.toRadixString(16) ?? "null"}'),
                         Text(
-                            'Max Priority Fee Per Gas: 0x${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${WalletService().convert2Decimal(_transaction!.maxPriorityFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
+                            'Max Priority Fee Per Gas: 0x${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${TransactionService().convert2Decimal(_transaction!.maxPriorityFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
                         Text(
-                            'Max Fee Per Gas: 0x${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${WalletService().convert2Decimal(_transaction!.maxFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
+                            'Max Fee Per Gas: 0x${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${TransactionService().convert2Decimal(_transaction!.maxFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
                         Text(
-                            'Gas limit: 0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? WalletService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
+                            'Gas limit: 0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? TransactionService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
                         Text('------------'),
                         Text('To: ${_transaction!.to?.hex ?? "null"}'),
                         Text(
@@ -174,7 +161,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         Text(
                             'Data: ${_transaction!.data != null ? _transaction!.data!.map((b) => b.toRadixString(16).padLeft(2, '0')).join() : "null"}'),
                         Text(
-                            'Decoded Data:\n${_transaction!.data != null ? WalletService().decodeTransactionData(_transaction!.data, widget.token.decimals) : "null"}'),
+                            'Decoded Data:\n${_transaction!.data != null ? TransactionService().decodeTransactionData(_transaction!.data, widget.token.decimals) : "null"}'),
                       ],
                     )
                   : const SizedBox.shrink(),

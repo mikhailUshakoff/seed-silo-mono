@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/network.dart';
-import 'package:seed_silo/services/wallet_service.dart';
 
 class NetworkService {
   static const String _networksKey = 'networks';
@@ -55,11 +54,6 @@ class NetworkService {
     }
 
     return null;
-  }
-
-  /// Get the wallet service for the current network
-  Future<WalletService?> getCurrentWallet() async {
-    return WalletService();
   }
 
   /// Set the active network in storage

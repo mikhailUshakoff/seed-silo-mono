@@ -22,10 +22,10 @@ import 'package:http/http.dart';
 /// returned by the getGasInEIP1559 function.
 enum RewardPercentile { low, medium, high }
 
-class WalletService {
-  static final WalletService _instance = WalletService._internal();
-  factory WalletService() => _instance;
-  WalletService._internal();
+class TransactionService {
+  static final TransactionService _instance = TransactionService._internal();
+  factory TransactionService() => _instance;
+  TransactionService._internal();
 
   static const String _tokensKey = 'tokens';
 

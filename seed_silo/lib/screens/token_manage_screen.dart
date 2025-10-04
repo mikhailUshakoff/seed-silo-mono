@@ -3,6 +3,7 @@ import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/services/network_service.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
+import 'package:seed_silo/services/token_service.dart';
 
 class TokenManageScreen extends StatefulWidget {
   const TokenManageScreen({super.key});
@@ -33,8 +34,7 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
 
   Future<void> _loadData() async {
     final network = await _networkService.getCurrentNetwork();
-    final wallet = await _networkService.getCurrentWallet();
-    final tokens = wallet != null ? await wallet.getTokens() : <Token>[];
+    final tokens = await TokenService().getTokens();
 
     setState(() {
       _currentNetwork = network;
@@ -48,19 +48,9 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
 
     setState(() => _isLoading = true);
 
-    final wallet = await _networkService.getCurrentWallet();
-    if (wallet == null) {
-      setState(() => _isLoading = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No wallet available')),
-      );
-      return;
-    }
-
     final beforeCount = _tokens.length;
-    final success = await wallet.addToken(address);
-    final tokens = await wallet.getTokens();
+    final success = await TokenService().addToken(address);
+    final tokens = await TokenService().getTokens();
 
     if (!mounted) return;
 
@@ -83,11 +73,8 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _removeToken(Token token) async {
-    final wallet = await _networkService.getCurrentWallet();
-    if (wallet == null) return;
-
-    await wallet.removeToken(token.address);
-    final tokens = await wallet.getTokens();
+    await TokenService().removeToken(token.address);
+    final tokens = await TokenService().getTokens();
     setState(() => _tokens = tokens);
   }
 
