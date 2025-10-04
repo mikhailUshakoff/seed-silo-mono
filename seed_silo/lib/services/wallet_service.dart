@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:convert/convert.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
+import 'package:seed_silo/services/network_service.dart';
+import 'package:seed_silo/services/token_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
@@ -20,15 +22,14 @@ import 'package:http/http.dart';
 /// returned by the getGasInEIP1559 function.
 enum RewardPercentile { low, medium, high }
 
-class EthWalletService {
-  static final EthWalletService _instance = EthWalletService._internal();
-  factory EthWalletService() => _instance;
-  EthWalletService._internal();
+class WalletService {
+  static final WalletService _instance = WalletService._internal();
+  factory WalletService() => _instance;
+  WalletService._internal();
 
   static const String _tokensKey = 'tokens';
 
-  static const String rpcUrl = 'https://ethereum-holesky-rpc.publicnode.com';
-  static const String _ethAddress =
+  static const String ethAddress =
       '0x0000000000000000000000000000000000000000';
   static const String erc20Abi = '''
       [
@@ -41,7 +42,7 @@ class EthWalletService {
 
   List<Token> _tokens = [];
 
-  bool isEthToken(String token) => token == _ethAddress;
+  bool isEthToken(String token) => token == ethAddress;
 
   String getEthereumAddressFromPublicKey(Uint8List publicKey) {
     Uint8List hashedKey = keccak256(publicKey);
@@ -90,7 +91,7 @@ class EthWalletService {
     final contract = DeployedContract(
       ContractAbi.fromJson(erc20Abi, 'ERC20'),
       EthereumAddress.fromHex(
-          _ethAddress), // dummy address, not used for decoding
+          ethAddress), // dummy address, not used for decoding
     );
 
     final function = contract.function('transfer');
@@ -179,6 +180,7 @@ class EthWalletService {
     // tx is EIP1559 add prefix 0x02
     tx2Send = prependTransactionType(0x02, tx2Send);
 
+final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
     final Web3Client client = Web3Client(rpcUrl, Client());
     String sendTxHash = await client.sendRawTransaction(tx2Send);
 
@@ -198,6 +200,7 @@ class EthWalletService {
 
   Future<BigInt> getBalance(String wallet, String token) async {
     final httpClient = http.Client();
+    final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(wallet);
     if (isEthToken(token)) {
@@ -232,6 +235,7 @@ class EthWalletService {
     RewardPercentile rewardPercentile = RewardPercentile.low,
   }) async {
     final httpClient = http.Client();
+    final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
     final sender = EthereumAddress.fromHex(from);
@@ -306,35 +310,24 @@ class EthWalletService {
   Future<List<Token>> getTokens() async {
     if (_tokens.isNotEmpty) return _tokens;
 
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_tokensKey);
-
-    if (jsonString == null) {
-      // Default token ETH
-      _tokens = [
-        Token(symbol: 'ETH', address: _ethAddress, decimals: 18),
-      ];
-      await _saveTokens();
-    } else {
-      final List<dynamic> jsonList = json.decode(jsonString);
-      _tokens = jsonList.map((e) => Token.fromJson(e)).toList();
-    }
+    _tokens = await TokenService().getTokens();
 
     return _tokens;
   }
 
-  Future<void> addToken(String address) async {
+  Future<bool> addToken(String address) async {
     // Check if already added
     if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
-      return;
+      return false;
     }
 
     // Fetch token info (symbol, decimals) from blockchain
-    final tokenInfo = await _fetchTokenInfo(address);
-    if (tokenInfo == null) return; // handle failure silently
+    final tokenInfo = await fetchTokenInfo(address);
+    if (tokenInfo == null) return false; // handle failure silently
 
     _tokens.add(tokenInfo);
     await _saveTokens();
+    return true;
   }
 
   Future<void> removeToken(String address) async {
@@ -349,8 +342,9 @@ class EthWalletService {
     await prefs.setString(_tokensKey, json.encode(jsonList));
   }
 
-  Future<Token?> _fetchTokenInfo(String address) async {
+  Future<Token?> fetchTokenInfo(String address) async {
     try {
+      final rpcUrl = (await NetworkService().getCurrentNetwork())!.rpcUrl;
       final Web3Client client = Web3Client(rpcUrl, Client());
 
       final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
