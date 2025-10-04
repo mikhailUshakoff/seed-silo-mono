@@ -27,8 +27,6 @@ class TransactionService {
   factory TransactionService() => _instance;
   TransactionService._internal();
 
-  static const String _tokensKey = 'tokens';
-
   static const String ethAddress =
       '0x0000000000000000000000000000000000000000';
   static const String erc20Abi = '''
@@ -39,8 +37,6 @@ class TransactionService {
         {"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
       ]
     ''';
-
-  List<Token> _tokens = [];
 
   bool isEthToken(String token) => token == ethAddress;
 
@@ -304,69 +300,6 @@ final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
       } catch (e) {
         return null;
       }
-    }
-  }
-
-  Future<bool> addToken(String address) async {
-    // Check if already added
-    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
-      return false;
-    }
-
-    // Fetch token info (symbol, decimals) from blockchain
-    final tokenInfo = await fetchTokenInfo(address);
-    if (tokenInfo == null) return false; // handle failure silently
-
-    _tokens.add(tokenInfo);
-    await _saveTokens();
-    return true;
-  }
-
-  Future<void> removeToken(String address) async {
-    _tokens
-        .removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
-    await _saveTokens();
-  }
-
-  Future<void> _saveTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = _tokens.map((t) => t.toJson()).toList();
-    await prefs.setString(_tokensKey, json.encode(jsonList));
-  }
-
-  Future<Token?> fetchTokenInfo(String address) async {
-    try {
-      final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
-      final Web3Client client = Web3Client(rpcUrl, Client());
-
-      final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
-
-      final DeployedContract contract = DeployedContract(
-        ContractAbi.fromJson(erc20Abi, 'ERC20'),
-        tokenAddress,
-      );
-
-      final symbolFunction = contract.function('symbol');
-      final decimalsFunction = contract.function('decimals');
-
-      final symbolResult = await client.call(
-        contract: contract,
-        function: symbolFunction,
-        params: [],
-      );
-
-      final decimalsResult = await client.call(
-        contract: contract,
-        function: decimalsFunction,
-        params: [],
-      );
-
-      final String symbol = symbolResult.first as String;
-      final int decimals = decimalsResult.first.toInt();
-
-      return Token(symbol: symbol, address: address, decimals: decimals);
-    } catch (e) {
-      return null;
     }
   }
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
-import 'package:seed_silo/services/token_service.dart';
+import 'package:seed_silo/providers/token_provider.dart';
 
 class TokenManageScreen extends StatefulWidget {
   final Network currentNetwork;
@@ -15,9 +16,6 @@ class TokenManageScreen extends StatefulWidget {
 
 class _TokenManageScreenState extends State<TokenManageScreen> {
   final _addressController = TextEditingController();
-
-  List<Token> _tokens = [];
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -32,32 +30,23 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _loadData() async {
-    final tokens = await TokenService().getTokens(widget.currentNetwork.chainId);
-
-    setState(() {
-      _tokens = tokens;
-    });
+    await context.read<TokenProvider>().loadTokens(widget.currentNetwork.chainId);
   }
 
   Future<void> _addToken() async {
     final address = _addressController.text.trim();
     if (address.isEmpty) return;
 
-    setState(() => _isLoading = true);
+    final tokenProvider = context.read<TokenProvider>();
+    final beforeCount = tokenProvider.tokens.length;
 
-    final beforeCount = _tokens.length;
-    final success = await TokenService().addToken(widget.currentNetwork,address);
-    final tokens = await TokenService().getTokens(widget.currentNetwork.chainId);
+    final success = await tokenProvider.addToken(widget.currentNetwork, address);
 
     if (!mounted) return;
 
-    setState(() {
-      _tokens = tokens;
-      _isLoading = false;
-      _addressController.clear();
-    });
+    _addressController.clear();
 
-    if (!success || tokens.length == beforeCount) {
+    if (!success || tokenProvider.tokens.length == beforeCount) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Token already exists or failed to fetch.')),
@@ -70,9 +59,7 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _removeToken(Token token) async {
-    await TokenService().removeToken(widget.currentNetwork.chainId, token.address);
-    final tokens = await TokenService().getTokens(widget.currentNetwork.chainId);
-    setState(() => _tokens = tokens);
+    await context.read<TokenProvider>().removeToken(widget.currentNetwork.chainId, token.address);
   }
 
   Future<void> _navigateToNetworkSettings() async {
@@ -80,40 +67,25 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
       context,
       MaterialPageRoute(builder: (context) => const NetworkManageScreen()),
     );
-    // Pop back to parent to refresh with new network
-    if (mounted) {
-      Navigator.pop(context);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Tokens'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Network Settings',
-            onPressed: _navigateToNetworkSettings,
-          ),
-        ],
+        title: const Text('Manage tokens'),
       ),
       body: Column(
         children: [
-          // Network indicator
           Container(
-            width: double.infinity,
             padding: const EdgeInsets.all(12),
             color: Theme.of(context).primaryColor.withOpacity(0.1),
             child: Row(
               children: [
-                const Icon(Icons.circle, size: 12, color: Colors.green),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Network: ${widget.currentNetwork.name}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 TextButton.icon(
@@ -126,52 +98,66 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Token address',
-                      border: OutlineInputBorder(),
+            child: Consumer<TokenProvider>(
+              builder: (context, tokenProvider, child) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Token address',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _addToken,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Add'),
-                ),
-              ],
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: tokenProvider.isLoading ? null : _addToken,
+                      child: tokenProvider.isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Add'),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           const Divider(),
           Expanded(
-            child: _tokens.isEmpty
-                ? const Center(
+            child: Consumer<TokenProvider>(
+              builder: (context, tokenProvider, child) {
+                if (tokenProvider.isLoading && tokenProvider.tokens.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (tokenProvider.tokens.isEmpty) {
+                  return const Center(
                     child: Text('No tokens added yet'),
-                  )
-                : ListView.builder(
-                    itemCount: _tokens.length,
-                    itemBuilder: (context, index) {
-                      final token = _tokens[index];
-                      return ListTile(
-                        title: Text(token.symbol),
-                        subtitle: Text(token.address),
-                        trailing: token.symbol != 'ETH'
-                            ? IconButton(
-                                icon: const Icon(Icons.delete),
-                                onPressed: () => _removeToken(token),
-                              )
-                            : null,
-                      );
-                    },
-                  ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: tokenProvider.tokens.length,
+                  itemBuilder: (context, index) {
+                    final token = tokenProvider.tokens[index];
+                    return ListTile(
+                      title: Text(token.symbol),
+                      subtitle: Text(token.address),
+                      trailing: token.symbol != 'ETH'
+                          ? IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _removeToken(token),
+                            )
+                          : null,
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),

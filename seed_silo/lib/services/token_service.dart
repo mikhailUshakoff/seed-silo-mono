@@ -19,12 +19,8 @@ class TokenService {
       ]
     ''';
 
-  List<Token>? _cachedTokens;
-
   /// Get tokens for the current wallet's network
   Future<List<Token>> getTokens(int networkId) async {
-    if (_cachedTokens != null) return _cachedTokens!;
-
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString('$_tokensKeyPrefix$networkId');
 
@@ -34,13 +30,12 @@ class TokenService {
       tokens = [
         defaultNativeToken,
       ];
-      await _saveTokens(networkId);
+      await _saveTokens(networkId, tokens);
     } else {
       final List<dynamic> jsonList = json.decode(jsonString);
       tokens = jsonList.map((e) => Token.fromJson(e)).toList();
     }
 
-    _cachedTokens = tokens;
     return tokens;
   }
 
@@ -58,8 +53,7 @@ class TokenService {
     if (tokenInfo == null) return false;
 
     tokens.add(tokenInfo);
-    _cachedTokens = tokens;
-    await _saveTokens(network.chainId);
+    await _saveTokens(network.chainId, tokens);
     return true;
   }
 
@@ -67,14 +61,12 @@ class TokenService {
   Future<void> removeToken(int networkId, String address) async {
     final tokens = await getTokens(networkId);
     tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
-    _cachedTokens = tokens;
-    await _saveTokens(networkId);
+    await _saveTokens(networkId, tokens);
   }
 
   /// Save tokens for current network
-  Future<void> _saveTokens(int networkId) async {
+  Future<void> _saveTokens(int networkId, List<Token> tokens) async {
     final prefs = await SharedPreferences.getInstance();
-    final tokens = _cachedTokens ?? [];
     final jsonList = tokens.map((t) => t.toJson()).toList();
     await prefs.setString('$_tokensKeyPrefix$networkId', json.encode(jsonList));
   }
@@ -85,12 +77,12 @@ class TokenService {
     await prefs.remove('$_tokensKeyPrefix$networkId');
   }
 
-  /// Clear cache (useful when switching networks)
+  /// Clear cache (useful when switching networks) - kept for compatibility
   void clearCache() {
-    _cachedTokens = null;
+    // No-op since we removed caching from service
   }
 
-    Future<Token?> fetchTokenInfo(String rpcUrl, String address) async {
+  Future<Token?> fetchTokenInfo(String rpcUrl, String address) async {
     try {
       final Web3Client client = Web3Client(rpcUrl, Client());
 
@@ -124,5 +116,4 @@ class TokenService {
       return null;
     }
   }
-
 }
