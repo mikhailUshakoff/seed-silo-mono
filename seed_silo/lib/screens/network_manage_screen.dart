@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
-import 'package:seed_silo/services/network_service.dart';
-import 'package:seed_silo/services/token_service.dart';
+import 'package:seed_silo/providers/network_provider.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -15,31 +15,12 @@ class NetworkManageScreen extends StatefulWidget {
 
 class _NetworkManageScreenState extends State<NetworkManageScreen> {
   final _rpcUrlController = TextEditingController();
-  final _networkService = NetworkService();
-
-  List<Network> _networks = [];
-  Network? _currentNetwork;
   bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNetworks();
-  }
 
   @override
   void dispose() {
     _rpcUrlController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadNetworks() async {
-    final networks = await _networkService.getNetworks();
-    final current = await _networkService.getCurrentNetwork();
-    setState(() {
-      _networks = networks;
-      _currentNetwork = current;
-    });
   }
 
   Future<void> _addNetwork() async {
@@ -62,7 +43,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
       final networkName = await _fetchNetworkName(chainId);
 
       // Check if network already exists
-      if (_networks.any((n) => n.chainId == chainId)) {
+      final networkProvider = context.read<NetworkProvider>();
+      if (networkProvider.networkExistsByChainId(chainId)) {
         if (!mounted) return;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -79,8 +61,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
         chainId: chainId,
       );
 
-      await _networkService.addNetwork(network);
-      await _loadNetworks();
+      await networkProvider.addNetwork(network);
 
       if (!mounted) return;
       setState(() {
@@ -125,8 +106,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
   }
 
   Future<void> _switchNetwork(Network network) async {
-    await _networkService.setCurrentNetwork(network.id);
-    await _loadNetworks();
+    final networkProvider = context.read<NetworkProvider>();
+    await networkProvider.setCurrentNetwork(network.id);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -157,9 +138,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
     );
 
     if (confirm == true) {
-      await _networkService.removeNetwork(network.id);
-      await TokenService.removeTokensForNetwork(network.id);
-      await _loadNetworks();
+      final networkProvider = context.read<NetworkProvider>();
+      await networkProvider.removeNetwork(network.id);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,82 +154,89 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
       appBar: AppBar(
         title: const Text('Manage Networks'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _rpcUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'RPC URL',
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _addNetwork,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Add'),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          Expanded(
-            child: _networks.isEmpty
-                ? const Center(
-                    child: Text('No networks configured'),
-                  )
-                : ListView.builder(
-                    itemCount: _networks.length,
-                    itemBuilder: (context, index) {
-                      final network = _networks[index];
-                      final isActive = network == _currentNetwork;
+      body: Consumer<NetworkProvider>(
+        builder: (context, networkProvider, child) {
+          final networks = networkProvider.networks;
+          final currentNetwork = networkProvider.currentNetwork;
 
-                      return ListTile(
-                        leading: Radio<Network>(
-                          value: network,
-                          groupValue: _currentNetwork,
-                          onChanged: (value) {
-                            if (value != null) _switchNetwork(value);
-                          },
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _rpcUrlController,
+                        decoration: const InputDecoration(
+                          labelText: 'RPC URL',
+                          hintText: 'https://...',
+                          border: OutlineInputBorder(),
                         ),
-                        title: Text(
-                          network.name,
-                          style: TextStyle(
-                            fontWeight:
-                                isActive ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Chain ID: ${network.chainId}\n${network.rpcUrl}',
-                        ),
-                        isThreeLine: true,
-                        trailing: isActive
-                            ? const Chip(
-                                label: Text('Active'),
-                                backgroundColor: Colors.green,
-                                labelStyle: TextStyle(color: Colors.white),
-                              )
-                            : IconButton(
-                                icon: const Icon(Icons.delete),
-                                onPressed: () => _removeNetwork(network),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _addNetwork,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Add'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: networks.isEmpty
+                    ? const Center(
+                        child: Text('No networks configured'),
+                      )
+                    : ListView.builder(
+                        itemCount: networks.length,
+                        itemBuilder: (context, index) {
+                          final network = networks[index];
+                          final isActive = network == currentNetwork;
+
+                          return ListTile(
+                            leading: Radio<Network>(
+                              value: network,
+                              groupValue: currentNetwork,
+                              onChanged: (value) {
+                                if (value != null) _switchNetwork(value);
+                              },
+                            ),
+                            title: Text(
+                              network.name,
+                              style: TextStyle(
+                                fontWeight:
+                                    isActive ? FontWeight.bold : FontWeight.normal,
                               ),
-                        onTap: isActive ? null : () => _switchNetwork(network),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                            ),
+                            subtitle: Text(
+                              'Chain ID: ${network.chainId}\n${network.rpcUrl}',
+                            ),
+                            isThreeLine: true,
+                            trailing: isActive
+                                ? const Chip(
+                                    label: Text('Active'),
+                                    backgroundColor: Colors.green,
+                                    labelStyle: TextStyle(color: Colors.white),
+                                  )
+                                : IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    onPressed: () => _removeNetwork(network),
+                                  ),
+                            onTap: isActive ? null : () => _switchNetwork(network),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

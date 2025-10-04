@@ -24,7 +24,9 @@ class TokenService {
   Future<List<Token>> getTokens() async {
     if (_cachedTokens != null) return _cachedTokens!;
 
-    final network = await(NetworkService().getCurrentNetwork());
+    // Get current network from provider context if available
+    // For now, fallback to direct service call
+    final network = await NetworkService().getCurrentNetwork();
     final networkId = network?.id;
     if (networkId == null) return [];
 
