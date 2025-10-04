@@ -2,6 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/services/network_service.dart';
 import 'package:seed_silo/services/token_service.dart';
+import 'package:web3dart/web3dart.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+class NetworkAddResult {
+  final bool success;
+  final Network? network;
+  final String? error;
+
+  NetworkAddResult.success(this.network) : success = true, error = null;
+  NetworkAddResult.error(this.error) : success = false, network = null;
+}
 
 class NetworkProvider extends ChangeNotifier {
   final NetworkService _networkService = NetworkService();
@@ -37,6 +49,69 @@ class NetworkProvider extends ChangeNotifier {
     _networks.add(network);
     await _networkService.saveNetworks(_networks);
     notifyListeners();
+  }
+
+  /// Add a new network from RPC URL
+  Future<NetworkAddResult> addNetworkFromRpc(String rpcUrl) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Get chain ID from RPC
+      final client = Web3Client(rpcUrl, http.Client());
+      final chainId = (await client.getChainId()).toInt();
+
+      // Check if network already exists
+      if (networkExistsByChainId(chainId)) {
+        _isLoading = false;
+        notifyListeners();
+        return NetworkAddResult.error('Network already exists');
+      }
+
+      // Fetch network name from chainid.network
+      final networkName = await _fetchNetworkName(chainId);
+
+      // Create network with fetched data
+      final network = Network(
+        name: networkName ?? 'Chain $chainId',
+        rpcUrl: rpcUrl,
+        chainId: chainId,
+      );
+
+      await addNetwork(network);
+
+      _isLoading = false;
+      notifyListeners();
+      return NetworkAddResult.success(network);
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return NetworkAddResult.error('Failed to add network: ${e.toString()}');
+    }
+  }
+
+  Future<String?> _fetchNetworkName(int chainId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://chainid.network/chains.json'),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> chains = json.decode(response.body);
+        final chain = chains.firstWhere(
+          (c) => c['chainId'] == chainId,
+          orElse: () => null,
+        );
+
+        if (chain != null && chain['name'] != null) {
+          return chain['name'] as String;
+        }
+      }
+    } catch (e) {
+      // If fetching fails, return null and use default name
+      debugPrint('Failed to fetch network name: $e');
+    }
+    return null;
   }
 
   /// Remove a network by ID

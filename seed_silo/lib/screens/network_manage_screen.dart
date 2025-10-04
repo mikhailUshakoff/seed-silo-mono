@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/providers/network_provider.dart';
-import 'package:web3dart/web3dart.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class NetworkManageScreen extends StatefulWidget {
   const NetworkManageScreen({super.key});
@@ -15,7 +12,6 @@ class NetworkManageScreen extends StatefulWidget {
 
 class _NetworkManageScreenState extends State<NetworkManageScreen> {
   final _rpcUrlController = TextEditingController();
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -32,76 +28,21 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    final networkProvider = context.read<NetworkProvider>();
+    final result = await networkProvider.addNetworkFromRpc(rpcUrl);
 
-    try {
-      // Get chain ID from RPC
-      final client = Web3Client(rpcUrl, http.Client());
-      final chainId = (await client.getChainId()).toInt();
+    if (!mounted) return;
 
-      // Fetch network name from chainid.network
-      final networkName = await _fetchNetworkName(chainId);
-
-      // Check if network already exists
-      final networkProvider = context.read<NetworkProvider>();
-      if (networkProvider.networkExistsByChainId(chainId)) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network already exists')),
-        );
-        return;
-      }
-
-      // Create network with fetched data
-      final network = Network(
-        name: networkName ?? 'Chain $chainId',
-        rpcUrl: rpcUrl,
-        chainId: chainId,
-      );
-
-      await networkProvider.addNetwork(network);
-
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _rpcUrlController.clear();
-      });
-
+    if (result.success) {
+      _rpcUrlController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Network "${network.name}" added')),
+        SnackBar(content: Text('Network "${result.network!.name}" added')),
       );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add network: ${e.toString()}')),
+        SnackBar(content: Text(result.error!)),
       );
     }
-  }
-
-  Future<String?> _fetchNetworkName(int chainId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://chainid.network/chains.json'),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> chains = json.decode(response.body);
-        final chain = chains.firstWhere(
-          (c) => c['chainId'] == chainId,
-          orElse: () => null,
-        );
-
-        if (chain != null && chain['name'] != null) {
-          return chain['name'] as String;
-        }
-      }
-    } catch (e) {
-      // If fetching fails, return null and use default name
-      debugPrint('Failed to fetch network name: $e');
-    }
-    return null;
   }
 
   Future<void> _switchNetwork(Network network) async {
@@ -137,6 +78,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
     );
 
     if (confirm == true) {
+      if (!mounted) return;
       final networkProvider = context.read<NetworkProvider>();
       await networkProvider.removeNetwork(network.chainId);
 
@@ -157,6 +99,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
         builder: (context, networkProvider, child) {
           final networks = networkProvider.networks;
           final currentNetwork = networkProvider.currentNetwork;
+          final isLoading = networkProvider.isLoading;
 
           return Column(
             children: [
@@ -176,8 +119,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _addNetwork,
-                      child: _isLoading
+                      onPressed: isLoading ? null : _addNetwork,
+                      child: isLoading
                           ? const SizedBox(
                               width: 16,
                               height: 16,
