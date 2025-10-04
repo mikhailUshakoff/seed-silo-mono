@@ -55,7 +55,6 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
 
       // Create network with fetched data
       final network = Network(
-        id: 'chain_$chainId',
         name: networkName ?? 'Chain $chainId',
         rpcUrl: rpcUrl,
         chainId: chainId,
@@ -107,7 +106,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
 
   Future<void> _switchNetwork(Network network) async {
     final networkProvider = context.read<NetworkProvider>();
-    await networkProvider.setCurrentNetwork(network.id);
+    await networkProvider.setCurrentNetwork(network.chainId);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -139,7 +138,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
 
     if (confirm == true) {
       final networkProvider = context.read<NetworkProvider>();
-      await networkProvider.removeNetwork(network.id);
+      await networkProvider.removeNetwork(network.chainId);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

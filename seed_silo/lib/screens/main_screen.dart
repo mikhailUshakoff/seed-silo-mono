@@ -233,7 +233,7 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
                     groupValue: currentNetwork,
                     onChanged: (value) async {
                       if (value != null) {
-                        await networkProvider.setCurrentNetwork(value.id);
+                        await networkProvider.setCurrentNetwork(value.chainId);
                         widget.onNetworkChanged();
                         Navigator.pop(context);
                       }
@@ -243,7 +243,7 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
                   subtitle: Text('Chain ID: ${network.chainId}'),
                   trailing: isActive ? const Icon(Icons.check, color: Colors.green) : null,
                   onTap: isActive ? null : () async {
-                    await networkProvider.setCurrentNetwork(network.id);
+                    await networkProvider.setCurrentNetwork(network.chainId);
                     widget.onNetworkChanged();
                     Navigator.pop(context);
                   },

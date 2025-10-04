@@ -27,7 +27,7 @@ class TokenService {
     // Get current network from provider context if available
     // For now, fallback to direct service call
     final network = await NetworkService().getCurrentNetwork();
-    final networkId = network?.id;
+    final networkId = network?.chainId;
     if (networkId == null) return [];
 
     final prefs = await SharedPreferences.getInstance();
@@ -84,7 +84,7 @@ class TokenService {
   /// Save tokens for current network
   Future<void> _saveTokens() async {
     final network = await(NetworkService().getCurrentNetwork());
-    final networkId = network?.id;
+    final networkId = network?.chainId;
     if (networkId == null) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -94,7 +94,7 @@ class TokenService {
   }
 
   /// Remove tokens for a specific network (called when network is deleted)
-  static Future<void> removeTokensForNetwork(String networkId) async {
+  static Future<void> removeTokensForNetwork(int networkId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_tokensKeyPrefix$networkId');
   }

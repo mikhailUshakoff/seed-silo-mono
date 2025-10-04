@@ -15,7 +15,6 @@ class NetworkService {
       // Default network
       final defaultNetworks = [
         Network(
-          id: 'holesky',
           name: 'Ethereum Holesky',
           rpcUrl: 'https://ethereum-holesky-rpc.publicnode.com',
           chainId: 17000,
@@ -32,23 +31,23 @@ class NetworkService {
   /// Get the currently active network from storage
   Future<Network?> getCurrentNetwork() async {
     final prefs = await SharedPreferences.getInstance();
-    final networkId = prefs.getString(_currentNetworkKey);
+    final networkId = prefs.getInt(_currentNetworkKey);
 
     if (networkId != null) {
       final networks = await getNetworks();
       try {
-        return networks.firstWhere((n) => n.id == networkId);
+        return networks.firstWhere((n) => n.chainId == networkId);
       } catch (e) {
         // Network not found, return first available
         if (networks.isNotEmpty) {
-          await setCurrentNetwork(networks.first.id);
+          await setCurrentNetwork(networks.first.chainId);
           return networks.first;
         }
       }
     } else {
       final networks = await getNetworks();
       if (networks.isNotEmpty) {
-        await setCurrentNetwork(networks.first.id);
+        await setCurrentNetwork(networks.first.chainId);
         return networks.first;
       }
     }
@@ -57,9 +56,9 @@ class NetworkService {
   }
 
   /// Set the active network in storage
-  Future<void> setCurrentNetwork(String networkId) async {
+  Future<void> setCurrentNetwork(int networkId) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_currentNetworkKey, networkId);
+    await prefs.setInt(_currentNetworkKey, networkId);
   }
 
   /// Clear current network from storage

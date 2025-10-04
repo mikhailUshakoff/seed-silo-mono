@@ -30,7 +30,7 @@ class NetworkProvider extends ChangeNotifier {
 
   /// Add a new network
   Future<void> addNetwork(Network network) async {
-    if (_networks.any((n) => n.id == network.id)) {
+    if (_networks.any((n) => n.chainId == network.chainId)) {
       return;
     }
 
@@ -40,16 +40,16 @@ class NetworkProvider extends ChangeNotifier {
   }
 
   /// Remove a network by ID
-  Future<void> removeNetwork(String networkId) async {
-    _networks.removeWhere((n) => n.id == networkId);
+  Future<void> removeNetwork(int networkId) async {
+    _networks.removeWhere((n) => n.chainId == networkId);
     await _networkService.saveNetworks(_networks);
 
     // If current network was removed, switch to first available
-    if (_currentNetwork?.id == networkId) {
+    if (_currentNetwork?.chainId == networkId) {
       _currentNetwork = null;
 
       if (_networks.isNotEmpty) {
-        await setCurrentNetwork(_networks.first.id);
+        await setCurrentNetwork(_networks.first.chainId);
       } else {
         await _networkService.clearCurrentNetwork();
       }
@@ -61,8 +61,8 @@ class NetworkProvider extends ChangeNotifier {
   }
 
   /// Set the active network
-  Future<void> setCurrentNetwork(String networkId) async {
-    final network = _networks.firstWhere((n) => n.id == networkId);
+  Future<void> setCurrentNetwork(int networkId) async {
+    final network = _networks.firstWhere((n) => n.chainId == networkId);
     _currentNetwork = network;
 
     await _networkService.setCurrentNetwork(networkId);
