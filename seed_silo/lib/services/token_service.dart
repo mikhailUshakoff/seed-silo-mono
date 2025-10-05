@@ -14,19 +14,15 @@ class TokenService {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString('$_tokensKeyPrefix$networkId');
 
-    List<Token> tokens;
     if (jsonString == null) {
       // Default native token
-      tokens = [
-        defaultNativeToken,
-      ];
-      await _saveTokens(networkId, tokens);
+      final tokens = [defaultNativeToken,];
+      await saveTokens(networkId, tokens);
+      return tokens;
     } else {
       final List<dynamic> jsonList = json.decode(jsonString);
-      tokens = jsonList.map((e) => Token.fromJson(e)).toList();
+      return jsonList.map((e) => Token.fromJson(e)).toList();
     }
-
-    return tokens;
   }
 
   /// Add a token to the current network
@@ -43,7 +39,7 @@ class TokenService {
     if (tokenInfo == null) return false;
 
     tokens.add(tokenInfo);
-    await _saveTokens(network.chainId, tokens);
+    await saveTokens(network.chainId, tokens);
     return true;
   }
 
@@ -51,11 +47,11 @@ class TokenService {
   Future<void> removeToken(int networkId, String address) async {
     final tokens = await getTokens(networkId);
     tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
-    await _saveTokens(networkId, tokens);
+    await saveTokens(networkId, tokens);
   }
 
   /// Save tokens for current network
-  Future<void> _saveTokens(int networkId, List<Token> tokens) async {
+  Future<void> saveTokens(int networkId, List<Token> tokens) async {
     final prefs = await SharedPreferences.getInstance();
     final jsonList = tokens.map((t) => t.toJson()).toList();
     await prefs.setString('$_tokensKeyPrefix$networkId', json.encode(jsonList));
@@ -65,11 +61,6 @@ class TokenService {
   static Future<void> removeTokensForNetwork(int networkId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_tokensKeyPrefix$networkId');
-  }
-
-  /// Clear cache (useful when switching networks) - kept for compatibility
-  void clearCache() {
-    // No-op since we removed caching from service
   }
 
   Future<Token?> fetchTokenInfo(String rpcUrl, String address) async {

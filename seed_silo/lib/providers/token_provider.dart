@@ -83,7 +83,6 @@ class TokenProvider with ChangeNotifier {
   void clearTokens() {
     _tokens = [];
     _currentNetworkId = null;
-    TokenService().clearCache();
     notifyListeners();
   }
 
