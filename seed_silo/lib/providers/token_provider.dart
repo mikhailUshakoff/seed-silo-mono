@@ -53,14 +53,16 @@ class TokenProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
-      final success = await TokenService().addToken(network, address);
-      if (success) {
-        _tokens = await TokenService().getTokens(network.chainId);
+      final updatedTokens =
+          await TokenService().addToken(network, address, _tokens);
+      if (updatedTokens.length > _tokens.length) {
+        _tokens = updatedTokens;
         notifyListeners();
+        return true; // Token was added
       }
-      return success;
+      return false; // Token already exists or failed to add
     } catch (e) {
-      return false;
+      return false; // Handle error
     } finally {
       _setLoading(false);
     }
@@ -68,24 +70,17 @@ class TokenProvider with ChangeNotifier {
 
   Future<void> removeToken(int networkId, String address) async {
     _setLoading(true);
-
-    try {
-      await TokenService().removeToken(networkId, address);
-      _tokens = await TokenService().getTokens(networkId);
-      notifyListeners();
-    } catch (e) {
-      // Handle error silently
-    } finally {
-      _setLoading(false);
-    }
+    _tokens = await TokenService().removeToken(networkId, address, _tokens);
+    _setLoading(false);
   }
 
+/*
   void clearTokens() {
     _tokens = [];
     _currentNetworkId = null;
     notifyListeners();
   }
-
+*/
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();

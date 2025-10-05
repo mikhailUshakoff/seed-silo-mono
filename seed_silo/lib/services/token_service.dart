@@ -16,7 +16,9 @@ class TokenService {
 
     if (jsonString == null) {
       // Default native token
-      final tokens = [defaultNativeToken,];
+      final tokens = [
+        defaultNativeToken,
+      ];
       await saveTokens(networkId, tokens);
       return tokens;
     } else {
@@ -24,7 +26,7 @@ class TokenService {
       return jsonList.map((e) => Token.fromJson(e)).toList();
     }
   }
-
+/*
   /// Add a token to the current network
   Future<bool> addToken(Network network, String address) async {
     final tokens = await getTokens(network.chainId);
@@ -41,13 +43,48 @@ class TokenService {
     tokens.add(tokenInfo);
     await saveTokens(network.chainId, tokens);
     return true;
+  }*/
+
+  Future<List<Token>> addToken(
+      Network network, String address, List<Token> currentTokens) async {
+    // Check if already exists
+    if (currentTokens
+        .any((t) => t.address.toLowerCase() == address.toLowerCase())) {
+      return currentTokens; // No changes
+    }
+
+    // Fetch token info from blockchain
+    final tokenInfo = await fetchTokenInfo(network.rpcUrl, address);
+    if (tokenInfo == null)
+      return currentTokens; // No changes if token info is null
+
+    // Add the new token
+    final updatedTokens = List<Token>.from(currentTokens)..add(tokenInfo);
+
+    // Save the updated token list
+    await saveTokens(network.chainId, updatedTokens);
+
+    return updatedTokens;
   }
 
+/*
   /// Remove a token from the current network
   Future<void> removeToken(int networkId, String address) async {
     final tokens = await getTokens(networkId);
     tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
     await saveTokens(networkId, tokens);
+  }
+*/
+  /// Remove a token from the current network
+  Future<List<Token>> removeToken(
+      int networkId, String address, List<Token> currentTokens) async {
+    if (address == nativeTokenAddress) {
+      return currentTokens; // Cannot remove native token
+    }
+    currentTokens
+        .removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
+    await saveTokens(networkId, currentTokens);
+    return currentTokens;
   }
 
   /// Save tokens for current network

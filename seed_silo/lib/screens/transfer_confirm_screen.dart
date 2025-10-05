@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
@@ -7,12 +8,14 @@ import 'package:web3dart/web3dart.dart';
 
 class TransferConfirmScreen extends StatefulWidget {
   final Token token;
+  final Network network;
   final String destination;
   final String amount;
 
   const TransferConfirmScreen({
     super.key,
     required this.token,
+    required this.network,
     required this.destination,
     required this.amount,
   });
@@ -72,6 +75,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     final bTx = await TransactionService().buildEip1559Transaction(
       walletAddress,
       widget.token.address,
+      widget.network.rpcUrl,
       widget.destination,
       widget.amount,
     );
@@ -87,14 +91,15 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     }
 
     if (!mounted) return;
-    _chainId = bTx.$1.toInt();
-    _transaction = bTx.$2;
+    _chainId = widget.network.chainId;
+    _transaction = bTx;
     setState(() {
       _showTxInfo = true;
     });
 
     final sendResult = await TransactionService().sendTransaction(
       Uint8List.fromList(_passwordController.text.codeUnits),
+      widget.network.rpcUrl,
       _transaction!,
       _chainId!.toInt(),
     );

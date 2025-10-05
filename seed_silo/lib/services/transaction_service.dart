@@ -1,12 +1,10 @@
 import 'package:convert/convert.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
-import 'package:seed_silo/services/network_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
 
 /// rewardPercentileIndex is an integer that represents which percentile of priority fees
 /// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
@@ -149,7 +147,7 @@ class TransactionService {
   }
 
   Future<String?> sendTransaction(
-      Uint8List textPassword, Transaction tx, int chainId) async {
+      Uint8List textPassword, String rpcUrl, Transaction tx, int chainId) async {
     if (!tx.isEIP1559) {
       nullifyUint8List(textPassword);
       return null;
@@ -171,8 +169,7 @@ class TransactionService {
     // tx is EIP1559 add prefix 0x02
     tx2Send = prependTransactionType(0x02, tx2Send);
 
-    final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
-    final Web3Client client = Web3Client(rpcUrl, Client());
+    final Web3Client client = Web3Client(rpcUrl, http.Client());
     String sendTxHash = await client.sendRawTransaction(tx2Send);
 
     return sendTxHash;
@@ -189,9 +186,8 @@ class TransactionService {
         : getEthereumAddressFromPublicKey(publicKey);
   }
 
-  Future<BigInt> getBalance(String wallet, String token) async {
+  Future<BigInt> getBalance(String wallet, String token, String rpcUrl) async {
     final httpClient = http.Client();
-    final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(wallet);
     if (isEthToken(token)) {
@@ -218,21 +214,20 @@ class TransactionService {
     }
   }
 
-  Future<(BigInt, Transaction)?> buildEip1559Transaction(
+  Future<Transaction?> buildEip1559Transaction(
     String from,
     String token,
+    String rpcUrl,
     String dst,
     String amount, {
     RewardPercentile rewardPercentile = RewardPercentile.low,
   }) async {
     final httpClient = http.Client();
-    final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
 
     final sender = EthereumAddress.fromHex(from);
     final dstAddress = EthereumAddress.fromHex(dst);
     final nonce = await ethClient.getTransactionCount(sender);
-    final chainId = await ethClient.getChainId();
 
     final gasInEIP1559 = await ethClient.getGasInEIP1559();
     if (gasInEIP1559.length != 3) {
@@ -246,8 +241,7 @@ class TransactionService {
     if (isEthToken(token)) {
       // Build ETH transfer
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
-      return (
-        chainId,
+      return
         Transaction(
           to: dstAddress,
           value: value,
@@ -256,7 +250,6 @@ class TransactionService {
           maxFeePerGas: maxFeePerGas,
           maxPriorityFeePerGas: maxPriorityFeePerGas,
           data: Uint8List.fromList([]),
-        )
       );
     } else {
       // Build ERC-20 token transfer
@@ -280,8 +273,7 @@ class TransactionService {
 
         final adjustedGas = (gasLimit.toDouble() * 1.2).ceil();
 
-        return (
-          chainId,
+        return
           Transaction(
             to: tokenAddress,
             value: EtherAmount.zero(),
@@ -290,7 +282,6 @@ class TransactionService {
             nonce: nonce,
             maxFeePerGas: maxFeePerGas,
             maxPriorityFeePerGas: maxPriorityFeePerGas,
-          )
         );
       } catch (e) {
         return null;

@@ -39,10 +39,10 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _onTokenTap(Token token) {
+  void _onTokenTap(Token token, Network network) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => TransferScreen(token: token),
+        builder: (_) => TransferScreen(token: token, network: network),
       ),
     );
   }
@@ -168,7 +168,7 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                             trailing:
                                 const Icon(Icons.arrow_forward_ios, size: 16),
-                            onTap: () => _onTokenTap(token),
+                            onTap: () => _onTokenTap(token, currentNetwork),
                           );
                         },
                       ),
@@ -225,7 +225,7 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
                       if (value != null) {
                         await networkProvider.setCurrentNetwork(value.chainId);
                         // Clear tokens when network changes
-                        context.read<TokenProvider>().clearTokens();
+                        //context.read<TokenProvider>().clearTokens();
                         widget.onNetworkChanged();
                         Navigator.pop(context);
                       }
@@ -242,7 +242,7 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
                           await networkProvider
                               .setCurrentNetwork(network.chainId);
                           // Clear tokens when network changes
-                          context.read<TokenProvider>().clearTokens();
+                          //context.read<TokenProvider>().clearTokens();
                           widget.onNetworkChanged();
                           Navigator.pop(context);
                         },
