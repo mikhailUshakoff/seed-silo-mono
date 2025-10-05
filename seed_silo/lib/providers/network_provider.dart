@@ -22,9 +22,9 @@ class NetworkAddResult {
 class NetworkProvider extends ChangeNotifier {
   final NetworkService _networkService = NetworkService();
 
-  List<Network> _networks = [];
-  late Network _currentNetwork;
-  bool _isLoading = false;
+  List<Network> _networks = [NetworkService.defaultNetwork];
+  Network _currentNetwork = NetworkService.defaultNetwork;
+  bool _isLoading = true;
 
   List<Network> get networks => _networks;
   Network get currentNetwork => _currentNetwork;
