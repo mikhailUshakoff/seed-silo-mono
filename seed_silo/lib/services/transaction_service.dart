@@ -1,12 +1,8 @@
-import 'dart:convert';
 import 'package:convert/convert.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/services/network_service.dart';
-import 'package:seed_silo/services/token_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:seed_silo/models/token.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
@@ -27,8 +23,7 @@ class TransactionService {
   factory TransactionService() => _instance;
   TransactionService._internal();
 
-  static const String ethAddress =
-      '0x0000000000000000000000000000000000000000';
+  static const String ethAddress = '0x0000000000000000000000000000000000000000';
   static const String erc20Abi = '''
       [
         {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
@@ -176,7 +171,7 @@ class TransactionService {
     // tx is EIP1559 add prefix 0x02
     tx2Send = prependTransactionType(0x02, tx2Send);
 
-final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
+    final rpcUrl = (await NetworkService().getCurrentNetwork()).rpcUrl;
     final Web3Client client = Web3Client(rpcUrl, Client());
     String sendTxHash = await client.sendRawTransaction(tx2Send);
 

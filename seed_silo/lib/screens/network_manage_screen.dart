@@ -153,8 +153,9 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                             title: Text(
                               network.name,
                               style: TextStyle(
-                                fontWeight:
-                                    isActive ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isActive
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                             subtitle: Text(
@@ -171,7 +172,8 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                                     icon: const Icon(Icons.delete),
                                     onPressed: () => _removeNetwork(network),
                                   ),
-                            onTap: isActive ? null : () => _switchNetwork(network),
+                            onTap:
+                                isActive ? null : () => _switchNetwork(network),
                           );
                         },
                       ),

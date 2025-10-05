@@ -55,6 +55,7 @@ class NetworkService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_currentNetworkKey, networkId);
   }
+
 /*
   /// Clear current network from storage
   Future<void> clearCurrentNetwork() async {

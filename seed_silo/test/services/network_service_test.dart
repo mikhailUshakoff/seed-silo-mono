@@ -9,7 +9,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('getNetworks returns 1 network when SharedPreferences is empty', () async {
+    test('getNetworks returns 1 network when SharedPreferences is empty',
+        () async {
       final networkService = NetworkService();
 
       final networks = await networkService.getNetworks();
@@ -17,7 +18,8 @@ void main() {
       expect(networks.length, 1);
       expect(networks.first.name, 'Ethereum Holesky');
       expect(networks.first.chainId, 17000);
-      expect(networks.first.rpcUrl, 'https://ethereum-holesky-rpc.publicnode.com');
+      expect(
+          networks.first.rpcUrl, 'https://ethereum-holesky-rpc.publicnode.com');
     });
   });
 }

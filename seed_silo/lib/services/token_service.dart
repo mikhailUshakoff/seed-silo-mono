@@ -9,16 +9,6 @@ import 'package:http/http.dart';
 class TokenService {
   static const String _tokensKeyPrefix = 'tokens_';
 
-  // ERC20 ABI for Ethereum-based tokens
-  static const String erc20Abi = '''
-      [
-        {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
-        {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},
-        {"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"type":"function"},
-        {"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"type":"function"}
-      ]
-    ''';
-
   /// Get tokens for the current wallet's network
   Future<List<Token>> getTokens(int networkId) async {
     final prefs = await SharedPreferences.getInstance();

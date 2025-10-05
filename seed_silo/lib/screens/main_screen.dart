@@ -18,36 +18,22 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   void _navigateToManageTokens(Network currentNetwork) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TokenManageScreen(currentNetwork: currentNetwork)),
+      MaterialPageRoute(
+          builder: (_) => TokenManageScreen(currentNetwork: currentNetwork)),
     );
-    // Reload after returning
-    if (mounted) {
-      final tokenProvider = Provider.of<TokenProvider>(context, listen: false);
-      await tokenProvider.loadTokens(currentNetwork.chainId);
-    }
   }
 
   void _navigateToNetworkSettings() async {
-    final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const NetworkManageScreen()),
     );
-    // Reload after returning
-    if (mounted) {
-      final tokenProvider = Provider.of<TokenProvider>(context, listen: false);
-      await tokenProvider.loadTokens(networkProvider.currentNetwork.chainId);
-    }
   }
 
   void _showNetworkMenu() {
     showModalBottomSheet(
       context: context,
       builder: (context) => _NetworkSelectorSheet(
-        onNetworkChanged: () async {
-          final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
-          final tokenProvider = Provider.of<TokenProvider>(context, listen: false);
-          await tokenProvider.loadTokens(networkProvider.currentNetwork.chainId);
-        },
+        onNetworkChanged: () async {},
         onManageNetworks: _navigateToNetworkSettings,
       ),
     );
@@ -66,7 +52,6 @@ class _MainScreenState extends State<MainScreen> {
     return Consumer2<NetworkProvider, TokenProvider>(
       builder: (context, networkProvider, tokenProvider, child) {
         final currentNetwork = networkProvider.currentNetwork;
-        tokenProvider.loadTokens(currentNetwork.chainId);
         final tokens = tokenProvider.tokens;
         final isLoading = tokenProvider.isLoading;
 
@@ -89,12 +74,14 @@ class _MainScreenState extends State<MainScreen> {
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.withOpacity(0.5)),
+                        border:
+                            Border.all(color: Colors.green.withOpacity(0.5)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.circle, size: 8, color: Colors.green),
+                          const Icon(Icons.circle,
+                              size: 8, color: Colors.green),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
@@ -123,9 +110,12 @@ class _MainScreenState extends State<MainScreen> {
           ),
           body: RefreshIndicator(
             onRefresh: () async {
-              final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
-              final tokenProvider = Provider.of<TokenProvider>(context, listen: false);
-              await tokenProvider.loadTokens(networkProvider.currentNetwork.chainId);
+              final tokenProvider =
+                  Provider.of<TokenProvider>(context, listen: false);
+              final networkProvider =
+                  Provider.of<NetworkProvider>(context, listen: false);
+              await tokenProvider
+                  .loadTokens(networkProvider.currentNetwork.chainId);
             },
             child: isLoading && tokens.isEmpty
                 ? const Center(child: CircularProgressIndicator())
@@ -134,17 +124,20 @@ class _MainScreenState extends State<MainScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.token, size: 64, color: Colors.grey),
+                            const Icon(Icons.token,
+                                size: 64, color: Colors.grey),
                             const SizedBox(height: 16),
                             const Text(
                               'No tokens found',
-                              style: TextStyle(fontSize: 18, color: Colors.grey),
+                              style:
+                                  TextStyle(fontSize: 18, color: Colors.grey),
                             ),
                             const SizedBox(height: 8),
                             TextButton.icon(
                               icon: const Icon(Icons.add),
                               label: const Text('Add Token'),
-                              onPressed: () => _navigateToManageTokens(currentNetwork),
+                              onPressed: () =>
+                                  _navigateToManageTokens(currentNetwork),
                             ),
                           ],
                         ),
@@ -157,12 +150,14 @@ class _MainScreenState extends State<MainScreen> {
                             leading: CircleAvatar(
                               child: Text(
                                 token.symbol.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
                               ),
                             ),
                             title: Text(
                               token.symbol,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             subtitle: Text(
                               '${token.address.substring(0, 6)}...${token.address.substring(token.address.length - 4)}',
@@ -171,7 +166,8 @@ class _MainScreenState extends State<MainScreen> {
                                 color: Colors.grey[600],
                               ),
                             ),
-                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                            trailing:
+                                const Icon(Icons.arrow_forward_ios, size: 16),
                             onTap: () => _onTokenTap(token),
                           );
                         },
@@ -237,14 +233,19 @@ class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
                   ),
                   title: Text(network.name),
                   subtitle: Text('Chain ID: ${network.chainId}'),
-                  trailing: isActive ? const Icon(Icons.check, color: Colors.green) : null,
-                  onTap: isActive ? null : () async {
-                    await networkProvider.setCurrentNetwork(network.chainId);
-                    // Clear tokens when network changes
-                    context.read<TokenProvider>().clearTokens();
-                    widget.onNetworkChanged();
-                    Navigator.pop(context);
-                  },
+                  trailing: isActive
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: isActive
+                      ? null
+                      : () async {
+                          await networkProvider
+                              .setCurrentNetwork(network.chainId);
+                          // Clear tokens when network changes
+                          context.read<TokenProvider>().clearTokens();
+                          widget.onNetworkChanged();
+                          Navigator.pop(context);
+                        },
                 );
               }).toList(),
               const Divider(),

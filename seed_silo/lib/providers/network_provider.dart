@@ -11,8 +11,12 @@ class NetworkAddResult {
   final Network? network;
   final String? error;
 
-  NetworkAddResult.success(this.network) : success = true, error = null;
-  NetworkAddResult.error(this.error) : success = false, network = null;
+  NetworkAddResult.success(this.network)
+      : success = true,
+        error = null;
+  NetworkAddResult.error(this.error)
+      : success = false,
+        network = null;
 }
 
 class NetworkProvider extends ChangeNotifier {
@@ -136,9 +140,7 @@ class NetworkProvider extends ChangeNotifier {
 
     await _networkService.setCurrentNetwork(networkId);
 
-    // Clear token cache when switching networks
-    TokenService().clearCache();
-
+    // TokenProvider will automatically handle token reloading via listener
     notifyListeners();
   }
 

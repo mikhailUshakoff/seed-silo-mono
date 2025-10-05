@@ -15,11 +15,11 @@ class SeedSiloApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (context) => NetworkProvider()..initialize(),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => TokenProvider(),
+        ChangeNotifierProvider(create: (_) => NetworkProvider()..initialize()),
+        ChangeNotifierProxyProvider<NetworkProvider, TokenProvider>(
+          create: (context) => TokenProvider(context.read<NetworkProvider>()),
+          update: (context, networkProvider, previous) =>
+              previous ?? TokenProvider(networkProvider),
         ),
       ],
       child: MaterialApp(

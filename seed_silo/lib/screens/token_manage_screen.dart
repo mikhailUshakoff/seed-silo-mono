@@ -18,19 +18,9 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   final _addressController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  @override
   void dispose() {
     _addressController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadData() async {
-    await context.read<TokenProvider>().loadTokens(widget.currentNetwork.chainId);
   }
 
   Future<void> _addToken() async {
@@ -40,7 +30,8 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
     final tokenProvider = context.read<TokenProvider>();
     final beforeCount = tokenProvider.tokens.length;
 
-    final success = await tokenProvider.addToken(widget.currentNetwork, address);
+    final success =
+        await tokenProvider.addToken(widget.currentNetwork, address);
 
     if (!mounted) return;
 
@@ -59,7 +50,9 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _removeToken(Token token) async {
-    await context.read<TokenProvider>().removeToken(widget.currentNetwork.chainId, token.address);
+    await context
+        .read<TokenProvider>()
+        .removeToken(widget.currentNetwork.chainId, token.address);
   }
 
   Future<void> _navigateToNetworkSettings() async {

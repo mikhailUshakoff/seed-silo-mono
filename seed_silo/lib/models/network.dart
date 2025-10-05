@@ -24,7 +24,9 @@ class Network {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Network && runtimeType == other.runtimeType && chainId == other.chainId;
+      other is Network &&
+          runtimeType == other.runtimeType &&
+          chainId == other.chainId;
 
   @override
   int get hashCode => chainId.hashCode;

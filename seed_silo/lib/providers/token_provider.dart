@@ -2,11 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/services/token_service.dart';
+import 'package:seed_silo/providers/network_provider.dart';
 
 class TokenProvider with ChangeNotifier {
-  static final TokenProvider _instance = TokenProvider._internal();
-  factory TokenProvider() => _instance;
-  TokenProvider._internal();
+  final NetworkProvider _networkProvider;
+
+  TokenProvider(this._networkProvider) {
+    _networkProvider.addListener(_onNetworkChanged);
+    _initialize();
+  }
 
   List<Token> _tokens = [];
   bool _isLoading = false;
@@ -14,6 +18,19 @@ class TokenProvider with ChangeNotifier {
 
   List<Token> get tokens => _tokens;
   bool get isLoading => _isLoading;
+
+  void _onNetworkChanged() {
+    final newNetworkId = _networkProvider.currentNetwork.chainId;
+    if (_currentNetworkId != newNetworkId) {
+      loadTokens(newNetworkId);
+    }
+  }
+
+  Future<void> _initialize() async {
+    if (!_networkProvider.isLoading) {
+      await loadTokens(_networkProvider.currentNetwork.chainId);
+    }
+  }
 
   Future<void> loadTokens(int networkId) async {
     if (_currentNetworkId == networkId && _tokens.isNotEmpty) {
@@ -73,5 +90,24 @@ class TokenProvider with ChangeNotifier {
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _networkProvider.removeListener(_onNetworkChanged);
+    super.dispose();
+  }
+
+  /// Initialize the provider by loading tokens for the current network
+  Future<void> initialize() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await loadTokens(_networkProvider.currentNetwork.chainId);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

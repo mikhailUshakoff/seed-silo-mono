@@ -17,8 +17,8 @@ class _PreloadScreenState extends State<PreloadScreen> {
   bool _isLoading = false;
 
   Future<void> _handleLogoTap() async {
-      //final prefs = await SharedPreferences.getInstance();
-      //await prefs.clear();
+    //final prefs = await SharedPreferences.getInstance();
+    //await prefs.clear();
     if (_isLoading || _clickCount >= _maxClickAttempts) return;
 
     setState(() => _isLoading = true);
