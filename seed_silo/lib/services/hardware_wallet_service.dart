@@ -16,6 +16,7 @@ class HardwareWalletService {
   static const int getSignatureCmd = 0x03;
 
   Future<int?> getVersion() async {
+    return 1;
     final ok = await SerialService().write([getVersionCmd]);
     if (ok == null) return null;
 

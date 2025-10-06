@@ -100,27 +100,38 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _rpcUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'RPC URL',
-                          hintText: 'https://...',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
+                    const Text(
+                      'Only Ethereum compatible networks are supported.',
+                      style: TextStyle(fontSize: 14, color: Colors.white),
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: isLoading ? null : _addNetwork,
-                      child: isLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Add'),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _rpcUrlController,
+                            decoration: const InputDecoration(
+                              labelText: 'RPC URL',
+                              hintText: 'https://...',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: isLoading ? null : _addNetwork,
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('Add'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
