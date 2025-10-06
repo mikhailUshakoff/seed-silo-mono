@@ -64,12 +64,12 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                   onTap: isActive
                       ? null
                       : () async {
-                            await networkProvider
+                          await networkProvider
                               .setCurrentNetwork(network.chainId);
-                           widget.onNetworkChanged();
-                            if (mounted) {
-                              Navigator.pop(context);
-                            }
+                          widget.onNetworkChanged();
+                          if (mounted) {
+                            Navigator.pop(context);
+                          }
                         },
                 );
               }),

@@ -75,8 +75,8 @@ class _MainScreenState extends State<MainScreen> {
                       decoration: BoxDecoration(
                         color: Colors.green.withAlpha((0.2 * 255).toInt()),
                         borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: Colors.green.withAlpha((0.5 * 255).toInt())),
+                        border: Border.all(
+                            color: Colors.green.withAlpha((0.5 * 255).toInt())),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
