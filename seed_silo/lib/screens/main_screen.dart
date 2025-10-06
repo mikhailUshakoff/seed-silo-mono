@@ -7,6 +7,7 @@ import 'package:seed_silo/screens/token_manage_screen.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 import 'package:seed_silo/providers/token_provider.dart';
+import 'package:seed_silo/widgets/network_selector_sheet.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -32,7 +33,7 @@ class _MainScreenState extends State<MainScreen> {
   void _showNetworkMenu() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => _NetworkSelectorSheet(
+      builder: (context) => NetworkSelectorSheet(
         onNetworkChanged: () async {},
         onManageNetworks: _navigateToNetworkSettings,
       ),
@@ -72,10 +73,10 @@ class _MainScreenState extends State<MainScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
+                        color: Colors.green.withAlpha((0.2 * 255).toInt()),
                         borderRadius: BorderRadius.circular(12),
                         border:
-                            Border.all(color: Colors.green.withOpacity(0.5)),
+                            Border.all(color: Colors.green.withAlpha((0.5 * 255).toInt())),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -175,92 +176,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-class _NetworkSelectorSheet extends StatefulWidget {
-  final VoidCallback onNetworkChanged;
-  final VoidCallback onManageNetworks;
-
-  const _NetworkSelectorSheet({
-    required this.onNetworkChanged,
-    required this.onManageNetworks,
-  });
-
-  @override
-  State<_NetworkSelectorSheet> createState() => _NetworkSelectorSheetState();
-}
-
-class _NetworkSelectorSheetState extends State<_NetworkSelectorSheet> {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Consumer<NetworkProvider>(
-        builder: (context, networkProvider, child) {
-          final networks = networkProvider.networks;
-          final currentNetwork = networkProvider.currentNetwork;
-          final isLoading = networkProvider.isLoading;
-
-          if (isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Select Network',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ...networks.map((network) {
-                final isActive = network == currentNetwork;
-                return ListTile(
-                  leading: Radio<Network>(
-                    value: network,
-                    groupValue: currentNetwork,
-                    onChanged: (value) async {
-                      if (value != null) {
-                        await networkProvider.setCurrentNetwork(value.chainId);
-                        // Clear tokens when network changes
-                        //context.read<TokenProvider>().clearTokens();
-                        widget.onNetworkChanged();
-                        Navigator.pop(context);
-                      }
-                    },
-                  ),
-                  title: Text(network.name),
-                  subtitle: Text('Chain ID: ${network.chainId}'),
-                  trailing: isActive
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: isActive
-                      ? null
-                      : () async {
-                          await networkProvider
-                              .setCurrentNetwork(network.chainId);
-                          // Clear tokens when network changes
-                          //context.read<TokenProvider>().clearTokens();
-                          widget.onNetworkChanged();
-                          Navigator.pop(context);
-                        },
-                );
-              }).toList(),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Manage Networks'),
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onManageNetworks();
-                },
-              ),
-            ],
-          );
-        },
-      ),
     );
   }
 }
