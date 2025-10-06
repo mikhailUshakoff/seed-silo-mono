@@ -5,6 +5,10 @@ class RemoveTokenResult {
   final String? error;
   final bool success;
 
-  RemoveTokenResult.success(this.tokens) : error = null, success = true;
-  RemoveTokenResult.error(this.error) : tokens = null, success = false;
+  RemoveTokenResult.success(this.tokens)
+      : error = null,
+        success = true;
+  RemoveTokenResult.error(this.error)
+      : tokens = null,
+        success = false;
 }

@@ -29,18 +29,15 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
     }
 
     final networkProvider = context.read<NetworkProvider>();
-    final result = await networkProvider.addNetworkFromRpc(rpcUrl);
+    final result = await networkProvider.addNetwork(rpcUrl);
 
     if (!mounted) return;
 
-    if (result.success) {
-      _rpcUrlController.clear();
+    _rpcUrlController.clear();
+
+    if (!result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Network "${result.network!.name}" added')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error!)),
+        SnackBar(content: Text(result.error ?? 'Failed to add network')),
       );
     }
   }
@@ -48,11 +45,6 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
   Future<void> _switchNetwork(Network network) async {
     final networkProvider = context.read<NetworkProvider>();
     await networkProvider.setCurrentNetwork(network.chainId);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Switched to ${network.name}')),
-    );
   }
 
   Future<void> _removeNetwork(Network network) async {
@@ -80,12 +72,15 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
     if (confirm == true) {
       if (!mounted) return;
       final networkProvider = context.read<NetworkProvider>();
-      await networkProvider.removeNetwork(network.chainId);
+      final result = await networkProvider.removeNetwork(network.chainId);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Network "${network.name}" removed')),
-      );
+
+      if (!result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.error ?? 'Failed to remove network')),
+        );
+      }
     }
   }
 

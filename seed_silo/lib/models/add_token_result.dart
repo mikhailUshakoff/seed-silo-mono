@@ -5,6 +5,10 @@ class AddTokenResult {
   final String? error;
   final bool success;
 
-  AddTokenResult.success(this.tokens) : error = null, success = true;
-  AddTokenResult.error(this.error) : tokens = null, success = false;
+  AddTokenResult.success(this.tokens)
+      : error = null,
+        success = true;
+  AddTokenResult.error(this.error)
+      : tokens = null,
+        success = false;
 }

@@ -146,8 +146,8 @@ class TransactionService {
     return buffer.toString();
   }
 
-  Future<String?> sendTransaction(
-      Uint8List textPassword, String rpcUrl, Transaction tx, int chainId) async {
+  Future<String?> sendTransaction(Uint8List textPassword, String rpcUrl,
+      Transaction tx, int chainId) async {
     if (!tx.isEIP1559) {
       nullifyUint8List(textPassword);
       return null;
@@ -241,15 +241,14 @@ class TransactionService {
     if (isEthToken(token)) {
       // Build ETH transfer
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
-      return
-        Transaction(
-          to: dstAddress,
-          value: value,
-          maxGas: 21000, // Standard ETH transfer gas limit
-          nonce: nonce,
-          maxFeePerGas: maxFeePerGas,
-          maxPriorityFeePerGas: maxPriorityFeePerGas,
-          data: Uint8List.fromList([]),
+      return Transaction(
+        to: dstAddress,
+        value: value,
+        maxGas: 21000, // Standard ETH transfer gas limit
+        nonce: nonce,
+        maxFeePerGas: maxFeePerGas,
+        maxPriorityFeePerGas: maxPriorityFeePerGas,
+        data: Uint8List.fromList([]),
       );
     } else {
       // Build ERC-20 token transfer
@@ -273,15 +272,14 @@ class TransactionService {
 
         final adjustedGas = (gasLimit.toDouble() * 1.2).ceil();
 
-        return
-          Transaction(
-            to: tokenAddress,
-            value: EtherAmount.zero(),
-            data: data,
-            maxGas: adjustedGas,
-            nonce: nonce,
-            maxFeePerGas: maxFeePerGas,
-            maxPriorityFeePerGas: maxPriorityFeePerGas,
+        return Transaction(
+          to: tokenAddress,
+          value: EtherAmount.zero(),
+          data: data,
+          maxGas: adjustedGas,
+          nonce: nonce,
+          maxFeePerGas: maxFeePerGas,
+          maxPriorityFeePerGas: maxPriorityFeePerGas,
         );
       } catch (e) {
         return null;

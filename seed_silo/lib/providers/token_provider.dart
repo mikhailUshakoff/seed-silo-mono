@@ -15,7 +15,7 @@ class TokenProvider with ChangeNotifier {
   }
 
   List<Token> _tokens = [];
-  bool _isLoading = false;
+  bool _isLoading = true;
   int? _currentNetworkId;
 
   List<Token> get tokens => _tokens;
@@ -74,13 +74,15 @@ class TokenProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
-      final result = await TokenService().removeToken(networkId, address, _tokens);
+      final result =
+          await TokenService().removeToken(networkId, address, _tokens);
 
       if (result.success && result.tokens != null) {
         _tokens = result.tokens!;
         return RemoveTokenResult.success(_tokens);
       } else {
-        return RemoveTokenResult.error(result.error ?? 'Unknown error occurred');
+        return RemoveTokenResult.error(
+            result.error ?? 'Unknown error occurred');
       }
     } catch (e) {
       return RemoveTokenResult.error('Error removing token: ${e.toString()}');
