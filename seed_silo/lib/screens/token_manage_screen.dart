@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:seed_silo/models/token.dart';
-import 'package:seed_silo/services/eth_wallet_service.dart';
+import 'package:seed_silo/models/network.dart';
+import 'package:seed_silo/screens/network_manage_screen.dart';
+import 'package:seed_silo/providers/token_provider.dart';
 
 class TokenManageScreen extends StatefulWidget {
-  const TokenManageScreen({super.key});
+  final Network currentNetwork;
+
+  const TokenManageScreen({super.key, required this.currentNetwork});
 
   @override
   State<TokenManageScreen> createState() => _TokenManageScreenState();
@@ -11,103 +16,139 @@ class TokenManageScreen extends StatefulWidget {
 
 class _TokenManageScreenState extends State<TokenManageScreen> {
   final _addressController = TextEditingController();
-  final _walletService = EthWalletService();
-
-  List<Token> _tokens = [];
-  bool _isLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadTokens();
-  }
-
-  Future<void> _loadTokens() async {
-    final tokens = await _walletService.getTokens();
-    setState(() {
-      _tokens = tokens;
-    });
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
   }
 
   Future<void> _addToken() async {
     final address = _addressController.text.trim();
     if (address.isEmpty) return;
 
-    setState(() => _isLoading = true);
+    final tokenProvider = context.read<TokenProvider>();
 
-    final beforeCount = _tokens.length;
-    await _walletService.addToken(address);
-    final tokens = await _walletService.getTokens();
+    final result = await tokenProvider.addToken(widget.currentNetwork, address);
 
     if (!mounted) return;
 
-    setState(() {
-      _tokens = tokens;
-      _isLoading = false;
-      _addressController.clear();
-    });
+    _addressController.clear();
 
-    if (tokens.length == beforeCount) {
+    if (!result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Token already exists or failed to fetch.')),
+        SnackBar(content: Text(result.error ?? 'Failed to add token')),
       );
     }
   }
 
   Future<void> _removeToken(Token token) async {
-    await _walletService.removeToken(token.address);
-    final tokens = await _walletService.getTokens();
-    setState(() => _tokens = tokens);
+    final result = await context
+        .read<TokenProvider>()
+        .removeToken(widget.currentNetwork.chainId, token.address);
+
+    if (!mounted) return;
+
+    if (!result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Failed to remove token')),
+      );
+    }
+  }
+
+  Future<void> _navigateToNetworkSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NetworkManageScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Tokens')),
+      appBar: AppBar(
+        title: const Text('Manage tokens'),
+      ),
       body: Column(
         children: [
-          Padding(
+          Container(
             padding: const EdgeInsets.all(12),
+            color: Theme.of(context).primaryColor.withOpacity(0.1),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Token address',
-                      border: OutlineInputBorder(),
-                    ),
+                  child: Text(
+                    'Network: ${widget.currentNetwork.name}',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _addToken,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Add'),
+                TextButton.icon(
+                  icon: const Icon(Icons.swap_horiz, size: 16),
+                  label: const Text('Switch'),
+                  onPressed: _navigateToNetworkSettings,
                 ),
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Consumer<TokenProvider>(
+              builder: (context, tokenProvider, child) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Token address',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: tokenProvider.isLoading ? null : _addToken,
+                      child: tokenProvider.isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Add'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
           const Divider(),
           Expanded(
-            child: ListView.builder(
-              itemCount: _tokens.length,
-              itemBuilder: (context, index) {
-                final token = _tokens[index];
-                return ListTile(
-                  title: Text(token.symbol),
-                  subtitle: Text(token.address),
-                  trailing: token.symbol != 'ETH'
-                      ? IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _removeToken(token),
-                        )
-                      : null,
+            child: Consumer<TokenProvider>(
+              builder: (context, tokenProvider, child) {
+                if (tokenProvider.isLoading && tokenProvider.tokens.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (tokenProvider.tokens.isEmpty) {
+                  return const Center(
+                    child: Text('No tokens added yet'),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: tokenProvider.tokens.length,
+                  itemBuilder: (context, index) {
+                    final token = tokenProvider.tokens[index];
+                    return ListTile(
+                      title: Text(token.symbol),
+                      subtitle: Text(token.address),
+                      trailing: token.symbol != 'ETH'
+                          ? IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _removeToken(token),
+                            )
+                          : null,
+                    );
+                  },
                 );
               },
             ),

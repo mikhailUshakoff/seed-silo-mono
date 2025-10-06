@@ -1,14 +1,10 @@
-import 'dart:convert';
 import 'package:convert/convert.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:seed_silo/models/token.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
 
 /// rewardPercentileIndex is an integer that represents which percentile of priority fees
 /// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
@@ -20,16 +16,12 @@ import 'package:http/http.dart';
 /// returned by the getGasInEIP1559 function.
 enum RewardPercentile { low, medium, high }
 
-class EthWalletService {
-  static final EthWalletService _instance = EthWalletService._internal();
-  factory EthWalletService() => _instance;
-  EthWalletService._internal();
+class TransactionService {
+  static final TransactionService _instance = TransactionService._internal();
+  factory TransactionService() => _instance;
+  TransactionService._internal();
 
-  static const String _tokensKey = 'tokens';
-
-  static const String rpcUrl = 'https://ethereum-holesky-rpc.publicnode.com';
-  static const String _ethAddress =
-      '0x0000000000000000000000000000000000000000';
+  static const String ethAddress = '0x0000000000000000000000000000000000000000';
   static const String erc20Abi = '''
       [
         {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},
@@ -39,9 +31,7 @@ class EthWalletService {
       ]
     ''';
 
-  List<Token> _tokens = [];
-
-  bool isEthToken(String token) => token == _ethAddress;
+  bool isEthToken(String token) => token == ethAddress;
 
   String getEthereumAddressFromPublicKey(Uint8List publicKey) {
     Uint8List hashedKey = keccak256(publicKey);
@@ -90,7 +80,7 @@ class EthWalletService {
     final contract = DeployedContract(
       ContractAbi.fromJson(erc20Abi, 'ERC20'),
       EthereumAddress.fromHex(
-          _ethAddress), // dummy address, not used for decoding
+          ethAddress), // dummy address, not used for decoding
     );
 
     final function = contract.function('transfer');
@@ -156,8 +146,8 @@ class EthWalletService {
     return buffer.toString();
   }
 
-  Future<String?> sendTransaction(
-      Uint8List textPassword, Transaction tx, int chainId) async {
+  Future<String?> sendTransaction(Uint8List textPassword, String rpcUrl,
+      Transaction tx, int chainId) async {
     if (!tx.isEIP1559) {
       nullifyUint8List(textPassword);
       return null;
@@ -179,7 +169,7 @@ class EthWalletService {
     // tx is EIP1559 add prefix 0x02
     tx2Send = prependTransactionType(0x02, tx2Send);
 
-    final Web3Client client = Web3Client(rpcUrl, Client());
+    final Web3Client client = Web3Client(rpcUrl, http.Client());
     String sendTxHash = await client.sendRawTransaction(tx2Send);
 
     return sendTxHash;
@@ -196,7 +186,7 @@ class EthWalletService {
         : getEthereumAddressFromPublicKey(publicKey);
   }
 
-  Future<BigInt> getBalance(String wallet, String token) async {
+  Future<BigInt> getBalance(String wallet, String token, String rpcUrl) async {
     final httpClient = http.Client();
     final Web3Client ethClient = Web3Client(rpcUrl, httpClient);
     final walletAddress = EthereumAddress.fromHex(wallet);
@@ -224,9 +214,10 @@ class EthWalletService {
     }
   }
 
-  Future<(BigInt, Transaction)?> buildEip1559Transaction(
+  Future<Transaction?> buildEip1559Transaction(
     String from,
     String token,
+    String rpcUrl,
     String dst,
     String amount, {
     RewardPercentile rewardPercentile = RewardPercentile.low,
@@ -237,7 +228,6 @@ class EthWalletService {
     final sender = EthereumAddress.fromHex(from);
     final dstAddress = EthereumAddress.fromHex(dst);
     final nonce = await ethClient.getTransactionCount(sender);
-    final chainId = await ethClient.getChainId();
 
     final gasInEIP1559 = await ethClient.getGasInEIP1559();
     if (gasInEIP1559.length != 3) {
@@ -251,17 +241,14 @@ class EthWalletService {
     if (isEthToken(token)) {
       // Build ETH transfer
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
-      return (
-        chainId,
-        Transaction(
-          to: dstAddress,
-          value: value,
-          maxGas: 21000, // Standard ETH transfer gas limit
-          nonce: nonce,
-          maxFeePerGas: maxFeePerGas,
-          maxPriorityFeePerGas: maxPriorityFeePerGas,
-          data: Uint8List.fromList([]),
-        )
+      return Transaction(
+        to: dstAddress,
+        value: value,
+        maxGas: 21000, // Standard ETH transfer gas limit
+        nonce: nonce,
+        maxFeePerGas: maxFeePerGas,
+        maxPriorityFeePerGas: maxPriorityFeePerGas,
+        data: Uint8List.fromList([]),
       );
     } else {
       // Build ERC-20 token transfer
@@ -285,102 +272,18 @@ class EthWalletService {
 
         final adjustedGas = (gasLimit.toDouble() * 1.2).ceil();
 
-        return (
-          chainId,
-          Transaction(
-            to: tokenAddress,
-            value: EtherAmount.zero(),
-            data: data,
-            maxGas: adjustedGas,
-            nonce: nonce,
-            maxFeePerGas: maxFeePerGas,
-            maxPriorityFeePerGas: maxPriorityFeePerGas,
-          )
+        return Transaction(
+          to: tokenAddress,
+          value: EtherAmount.zero(),
+          data: data,
+          maxGas: adjustedGas,
+          nonce: nonce,
+          maxFeePerGas: maxFeePerGas,
+          maxPriorityFeePerGas: maxPriorityFeePerGas,
         );
       } catch (e) {
         return null;
       }
-    }
-  }
-
-  Future<List<Token>> getTokens() async {
-    if (_tokens.isNotEmpty) return _tokens;
-
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_tokensKey);
-
-    if (jsonString == null) {
-      // Default token ETH
-      _tokens = [
-        Token(symbol: 'ETH', address: _ethAddress, decimals: 18),
-      ];
-      await _saveTokens();
-    } else {
-      final List<dynamic> jsonList = json.decode(jsonString);
-      _tokens = jsonList.map((e) => Token.fromJson(e)).toList();
-    }
-
-    return _tokens;
-  }
-
-  Future<void> addToken(String address) async {
-    // Check if already added
-    if (_tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
-      return;
-    }
-
-    // Fetch token info (symbol, decimals) from blockchain
-    final tokenInfo = await _fetchTokenInfo(address);
-    if (tokenInfo == null) return; // handle failure silently
-
-    _tokens.add(tokenInfo);
-    await _saveTokens();
-  }
-
-  Future<void> removeToken(String address) async {
-    _tokens
-        .removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
-    await _saveTokens();
-  }
-
-  Future<void> _saveTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = _tokens.map((t) => t.toJson()).toList();
-    await prefs.setString(_tokensKey, json.encode(jsonList));
-  }
-
-  Future<Token?> _fetchTokenInfo(String address) async {
-    try {
-      final Web3Client client = Web3Client(rpcUrl, Client());
-
-      final EthereumAddress tokenAddress = EthereumAddress.fromHex(address);
-
-      final DeployedContract contract = DeployedContract(
-        ContractAbi.fromJson(erc20Abi, 'ERC20'),
-        tokenAddress,
-      );
-
-      final symbolFunction = contract.function('symbol');
-      final decimalsFunction = contract.function('decimals');
-
-      final symbolResult = await client.call(
-        contract: contract,
-        function: symbolFunction,
-        params: [],
-      );
-
-      final decimalsResult = await client.call(
-        contract: contract,
-        function: decimalsFunction,
-        params: [],
-      );
-
-      final String symbol = symbolResult.first as String;
-      final int decimals = decimalsResult.first.toInt();
-
-      return Token(symbol: symbol, address: address, decimals: decimals);
-    } catch (e) {
-      return null;
     }
   }
 }
