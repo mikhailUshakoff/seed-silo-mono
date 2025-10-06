@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/models/network.dart';
+import 'package:seed_silo/models/add_token_result.dart';
+import 'package:seed_silo/models/remove_token_result.dart';
 import 'package:seed_silo/services/token_service.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 
@@ -49,38 +51,44 @@ class TokenProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> addToken(Network network, String address) async {
+  Future<AddTokenResult> addToken(Network network, String address) async {
     _setLoading(true);
 
     try {
-      final updatedTokens =
-          await TokenService().addToken(network, address, _tokens);
-      if (updatedTokens.length > _tokens.length) {
-        _tokens = updatedTokens;
-        notifyListeners();
-        return true; // Token was added
+      final result = await TokenService().addToken(network, address, _tokens);
+
+      if (result.success && result.tokens != null) {
+        _tokens = result.tokens!;
+        return AddTokenResult.success(_tokens);
+      } else {
+        return AddTokenResult.error(result.error ?? 'Unknown error occurred');
       }
-      return false; // Token already exists or failed to add
     } catch (e) {
-      return false; // Handle error
+      return AddTokenResult.error('Error adding token: ${e.toString()}');
     } finally {
       _setLoading(false);
     }
   }
 
-  Future<void> removeToken(int networkId, String address) async {
+  Future<RemoveTokenResult> removeToken(int networkId, String address) async {
     _setLoading(true);
-    _tokens = await TokenService().removeToken(networkId, address, _tokens);
-    _setLoading(false);
+
+    try {
+      final result = await TokenService().removeToken(networkId, address, _tokens);
+
+      if (result.success && result.tokens != null) {
+        _tokens = result.tokens!;
+        return RemoveTokenResult.success(_tokens);
+      } else {
+        return RemoveTokenResult.error(result.error ?? 'Unknown error occurred');
+      }
+    } catch (e) {
+      return RemoveTokenResult.error('Error removing token: ${e.toString()}');
+    } finally {
+      _setLoading(false);
+    }
   }
 
-/*
-  void clearTokens() {
-    _tokens = [];
-    _currentNetworkId = null;
-    notifyListeners();
-  }
-*/
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();

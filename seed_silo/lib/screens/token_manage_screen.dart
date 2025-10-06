@@ -28,31 +28,32 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
     if (address.isEmpty) return;
 
     final tokenProvider = context.read<TokenProvider>();
-    final beforeCount = tokenProvider.tokens.length;
 
-    final success =
-        await tokenProvider.addToken(widget.currentNetwork, address);
+    final result = await tokenProvider.addToken(widget.currentNetwork, address);
 
     if (!mounted) return;
 
     _addressController.clear();
 
-    if (!success || tokenProvider.tokens.length == beforeCount) {
+    if (!result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Token already exists or failed to fetch.')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Token added successfully')),
+        SnackBar(content: Text(result.error ?? 'Failed to add token')),
       );
     }
   }
 
   Future<void> _removeToken(Token token) async {
-    await context
+    final result = await context
         .read<TokenProvider>()
         .removeToken(widget.currentNetwork.chainId, token.address);
+
+    if (!mounted) return;
+
+    if (!result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Failed to remove token')),
+      );
+    }
   }
 
   Future<void> _navigateToNetworkSettings() async {

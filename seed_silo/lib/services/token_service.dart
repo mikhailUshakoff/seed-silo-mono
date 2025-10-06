@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:seed_silo/models/network.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:seed_silo/models/add_token_result.dart';
+import 'package:seed_silo/models/remove_token_result.dart';
 
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart';
@@ -26,65 +28,55 @@ class TokenService {
       return jsonList.map((e) => Token.fromJson(e)).toList();
     }
   }
-/*
-  /// Add a token to the current network
-  Future<bool> addToken(Network network, String address) async {
-    final tokens = await getTokens(network.chainId);
 
-    // Check if already exists
-    if (tokens.any((t) => t.address.toLowerCase() == address.toLowerCase())) {
-      return false;
-    }
-
-    // Fetch token info from blockchain
-    final tokenInfo = await fetchTokenInfo(network.rpcUrl, address);
-    if (tokenInfo == null) return false;
-
-    tokens.add(tokenInfo);
-    await saveTokens(network.chainId, tokens);
-    return true;
-  }*/
-
-  Future<List<Token>> addToken(
+  Future<AddTokenResult> addToken(
       Network network, String address, List<Token> currentTokens) async {
-    // Check if already exists
-    if (currentTokens
-        .any((t) => t.address.toLowerCase() == address.toLowerCase())) {
-      return currentTokens; // No changes
+    try {
+      // Check if already exists
+      if (currentTokens
+          .any((t) => t.address.toLowerCase() == address.toLowerCase())) {
+        return AddTokenResult.error('Token already exists');
+      }
+
+      // Fetch token info from blockchain
+      final tokenInfo = await fetchTokenInfo(network.rpcUrl, address);
+      if (tokenInfo == null) {
+        return AddTokenResult.error('Failed to fetch token information');
+      }
+
+      // Add the new token
+      final updatedTokens = List<Token>.from(currentTokens)..add(tokenInfo);
+
+      // Save the updated token list
+      await saveTokens(network.chainId, updatedTokens);
+
+      return AddTokenResult.success(updatedTokens);
+    } catch (e) {
+      return AddTokenResult.error('Error adding token: ${e.toString()}');
     }
-
-    // Fetch token info from blockchain
-    final tokenInfo = await fetchTokenInfo(network.rpcUrl, address);
-    if (tokenInfo == null)
-      return currentTokens; // No changes if token info is null
-
-    // Add the new token
-    final updatedTokens = List<Token>.from(currentTokens)..add(tokenInfo);
-
-    // Save the updated token list
-    await saveTokens(network.chainId, updatedTokens);
-
-    return updatedTokens;
   }
 
-/*
   /// Remove a token from the current network
-  Future<void> removeToken(int networkId, String address) async {
-    final tokens = await getTokens(networkId);
-    tokens.removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
-    await saveTokens(networkId, tokens);
-  }
-*/
-  /// Remove a token from the current network
-  Future<List<Token>> removeToken(
+  Future<RemoveTokenResult> removeToken(
       int networkId, String address, List<Token> currentTokens) async {
-    if (address == nativeTokenAddress) {
-      return currentTokens; // Cannot remove native token
+    try {
+      if (address == nativeTokenAddress) {
+        return RemoveTokenResult.error('Cannot remove native token');
+      }
+
+      final initialLength = currentTokens.length;
+      currentTokens
+          .removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
+
+      if (currentTokens.length == initialLength) {
+        return RemoveTokenResult.error('Token not found');
+      }
+
+      await saveTokens(networkId, currentTokens);
+      return RemoveTokenResult.success(currentTokens);
+    } catch (e) {
+      return RemoveTokenResult.error('Error removing token: ${e.toString()}');
     }
-    currentTokens
-        .removeWhere((t) => t.address.toLowerCase() == address.toLowerCase());
-    await saveTokens(networkId, currentTokens);
-    return currentTokens;
   }
 
   /// Save tokens for current network
