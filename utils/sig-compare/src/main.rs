@@ -10,54 +10,81 @@ async fn main() -> anyhow::Result<()> {
     let private_key = std::env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
     let plaintext = hex::decode(private_key).unwrap();
 
-    // --- Config ---
-    let tx_hash = std::env::var("TX_HASH").expect("TX_HASH must be set");
-    println!("TX_HASH: {}", tx_hash);
-    let tx_hash = TxHash::from_str(&tx_hash)?;
-    let provider = Provider::<Http>::try_from("https://ethereum-holesky-rpc.publicnode.com")?;
+    // --- Hash list ---
+    let tx_hashes = std::env::var("TX_HASHES").expect("TX_HASHES must be set");
+    let hash_list: Vec<&str> = tx_hashes.split(',').map(|s| s.trim()).collect();
 
-    // --- Fetch Transaction ---
-    let tx: Transaction = provider.get_transaction(tx_hash).await?
-        .ok_or_else(|| anyhow::anyhow!("Transaction not found"))?;
-
-    if tx.transaction_type != Some(U64::from(2)) {
-        return Err(anyhow::anyhow!("Transaction is not EIP-1559 (type 0x2)"));
-    }
-
-    // --- Rebuild TypedTransaction ---
-    let tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
-        from: Some(tx.from),
-        to: Some(NameOrAddress::Address(tx.to.unwrap())),
-        value: Some(tx.value),
-        data: Some(tx.input.clone()),
-        nonce: Some(tx.nonce),
-        chain_id: Some(tx.chain_id.unwrap_or_else(|| U256::from(1)).as_u64().into()),
-        max_fee_per_gas: tx.max_fee_per_gas,
-        max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
-        gas: Some(tx.gas),
-        access_list: tx.access_list.unwrap_or_default(),
-    });
-
-    // --- Sign locally ---
+    // --- RPC URL ---
+    let rpc_url = std::env::var("RPC_URL").unwrap_or_else(|_| "https://sepolia.optimism.io".to_string());
+    let provider = Provider::<Http>::try_from(rpc_url.as_str())?;
+    //let provider = Provider::<Http>::try_from("https://ethereum-holesky-rpc.publicnode.com")?;
+    //let provider = Provider::<Http>::try_from("https://sepolia.optimism.io")?;
     let signing_key = SigningKey::from_slice(&plaintext).unwrap();
-    let rlp_unsigned = tx_req.rlp();
-    let message_hash = Keccak256::digest(rlp_unsigned);
 
-    let local_signature = signing_key.sign_prehash_recoverable(&message_hash).unwrap();
-    println!("Local Signature: {}, v: {:?}", &local_signature.0, &local_signature.1);
+    for (index, hash_str) in hash_list.iter().enumerate() {
+        println!("\n--- Processing hash {} of {} ---", index + 1, hash_list.len());
+        println!("TX_HASH: {}", hash_str);
 
-    // --- Compare signatures ---
-    let (r, s, v) = (tx.r, tx.s, tx.v) ;
-    let network_sig = Signature { r, s, v: v.as_u64() };
-    println!("Network Signature: {}", network_sig);
+        let tx_hash = match TxHash::from_str(hash_str) {
+            Ok(hash) => hash,
+            Err(e) => {
+                println!("❌ Invalid hash format: {}", e);
+                continue;
+            }
+        };
 
-    if network_sig.r == U256::from_big_endian(&local_signature.0.r().to_bytes())
-        && network_sig.s == U256::from_big_endian(&local_signature.0.s().to_bytes())
-        && network_sig.v == local_signature.1.to_byte() as u64
-    {
-        println!("✅ Signatures match!");
-    } else {
-        println!("❌ Signatures differ.");
+        // --- Fetch Transaction ---
+        let tx: Transaction = match provider.get_transaction(tx_hash).await {
+            Ok(Some(tx)) => tx,
+            Ok(None) => {
+                println!("❌ Transaction not found");
+                continue;
+            }
+            Err(e) => {
+                println!("❌ Error fetching transaction: {}", e);
+                continue;
+            }
+        };
+
+        if tx.transaction_type != Some(U64::from(2)) {
+            println!("❌ Transaction is not EIP-1559 (type 0x2)");
+            continue;
+        }
+
+        // --- Rebuild TypedTransaction ---
+        let tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
+            from: Some(tx.from),
+            to: Some(NameOrAddress::Address(tx.to.unwrap())),
+            value: Some(tx.value),
+            data: Some(tx.input.clone()),
+            nonce: Some(tx.nonce),
+            chain_id: Some(tx.chain_id.unwrap_or_else(|| U256::from(1)).as_u64().into()),
+            max_fee_per_gas: tx.max_fee_per_gas,
+            max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
+            gas: Some(tx.gas),
+            access_list: tx.access_list.unwrap_or_default(),
+        });
+
+        // --- Sign locally ---
+        let rlp_unsigned = tx_req.rlp();
+        let message_hash = Keccak256::digest(rlp_unsigned);
+
+        let local_signature = signing_key.sign_prehash_recoverable(&message_hash).unwrap();
+        println!("Local Signature: {}, v: {:?}", &local_signature.0, &local_signature.1);
+
+        // --- Compare signatures ---
+        let (r, s, v) = (tx.r, tx.s, tx.v) ;
+        let network_sig = Signature { r, s, v: v.as_u64() };
+        println!("Network Signature: {}", network_sig);
+
+        if network_sig.r == U256::from_big_endian(&local_signature.0.r().to_bytes())
+            && network_sig.s == U256::from_big_endian(&local_signature.0.s().to_bytes())
+            && network_sig.v == local_signature.1.to_byte() as u64
+        {
+            println!("✅ Signatures match!");
+        } else {
+            println!("❌ Signatures differ.");
+        }
     }
 
     Ok(())
