@@ -4,7 +4,7 @@ A secure hardware wallet implementation built on the ESP32 microcontroller platf
 
 ## Overview
 
-Seed Silo is a hardware wallet designed to provide secure storage and management of cryptocurrency seeds and private keys using the ESP32 microcontroller. The device offers offline key generation, secure storage, and transaction signing capabilities.
+Seed Silo is a hardware wallet designed to provide secure storage and management of cryptocurrency private keys using the ESP32 microcontroller. The device offers secure storage and transaction signing capabilities.
 
 ## Project Structure
 
