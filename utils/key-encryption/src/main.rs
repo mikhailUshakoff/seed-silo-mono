@@ -38,7 +38,7 @@ fn load_keys() -> Vec<KeyInfo> {
 
         let position: usize = parts[1].trim().parse().expect("Invalid position");
 
-        if position + PLAINTEXT_LEN > private_key.len() {
+        if position + KEY_LEN > PLAINTEXT_LEN {
             panic!("Invalid key position: {} at index:{}", position,i);
         }
 
