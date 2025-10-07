@@ -19,7 +19,7 @@ fn load_keys() -> Vec<KeyInfo> {
     let pairs_str = env::var("PRIVATE_KEYS").expect("PRIVATE_KEYS must be set");
     let mut pairs = Vec::new();
 
-    for (i,pair_str) in pairs_str.split(';').enumerate() {
+    for (i, pair_str) in pairs_str.split(';').enumerate() {
         if pair_str.trim().is_empty() {
             continue;
         }
