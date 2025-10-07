@@ -89,8 +89,8 @@ fn main() {
 
     // Print the results
     let iv_formatted: Vec<String> = iv.iter().map(|byte| format!("0x{:02x}", byte)).collect();
-    println!("#define AES_IV_INITIALIZER {{{}}};", iv_formatted.join(", "));
+    println!("#define AES_IV_INITIALIZER {{{}}}", iv_formatted.join(", "));
     let chipertext_formatted: Vec<String> = ciphertext.iter().map(|byte| format!("0x{:02x}", byte)).collect();
-    println!("#define ENCRYPTED_DATA_INITIALIZER {{{}}};", chipertext_formatted.join(", "));
+    println!("#define ENCRYPTED_DATA_INITIALIZER {{{}}}", chipertext_formatted.join(", "));
 
 }
