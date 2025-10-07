@@ -15,21 +15,28 @@ class HardwareWalletService {
   static const int getUncompressedPublicKeyCmd = 0x02;
   static const int getSignatureCmd = 0x03;
 
+  static const Duration readTimeout = Duration(milliseconds: 500);
+
   Future<int?> getVersion() async {
     final ok = await SerialService().write([getVersionCmd]);
     if (ok == null) return null;
 
-    await Future.delayed(Duration(seconds: 3));
+    Uint8List? buffer;
+    while (buffer == null || buffer.isEmpty) {
+      await Future.delayed(readTimeout);
+      buffer = await SerialService().read(1);
+    }
 
-    final buffer = await SerialService().read(1);
-    if (buffer?.length == 1 && buffer?[0] == 0xF0) {
+    SerialService().close();
+
+    if (buffer.length == 1 && buffer[0] == 0xF0) {
       return 1;
     }
 
     return null;
   }
 
-  Uint8List intTo2Bytes(int value) {
+  Uint8List _intTo2Bytes(int value) {
     final bytes = ByteData(2);
     bytes.setUint16(0, value, Endian.big);
     return bytes.buffer.asUint8List();
@@ -40,7 +47,7 @@ class HardwareWalletService {
     final request = [getSignatureCmd];
     request.addAll(password);
     nullifyUint8List(password);
-    request.addAll(intTo2Bytes(rawTransaction.length));
+    request.addAll(_intTo2Bytes(rawTransaction.length));
     request.addAll(rawTransaction);
 
     final ok = await SerialService().write(request);
@@ -49,9 +56,11 @@ class HardwareWalletService {
 
     Uint8List? buffer;
     while (buffer == null || buffer.isEmpty) {
-      await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(readTimeout);
       buffer = await SerialService().read(66);
     }
+
+    SerialService().close();
 
     if (buffer.length != 66 || buffer[0] != 0xF0) {
       return null;
@@ -75,11 +84,16 @@ class HardwareWalletService {
     nullifyListInt(request);
     if (ok == null) return null;
 
-    await Future.delayed(Duration(seconds: 2));
+    Uint8List? buffer;
+    while (buffer == null || buffer.isEmpty) {
+      await Future.delayed(readTimeout);
+      buffer = await SerialService().read(66);
+    }
 
-    final buffer = await SerialService().read(66);
-    if (buffer?.length == 66 || buffer?[0] == 0xF0) {
-      return buffer?.sublist(2);
+    SerialService().close();
+
+    if (buffer.length == 66 || buffer[0] == 0xF0) {
+      return buffer.sublist(2);
     }
 
     return null;

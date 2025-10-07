@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/screens/main_screen.dart';
+//import 'package:shared_preferences/shared_preferences.dart';
 
 class PreloadScreen extends StatefulWidget {
   const PreloadScreen({super.key});
@@ -16,6 +17,8 @@ class _PreloadScreenState extends State<PreloadScreen> {
   bool _isLoading = false;
 
   Future<void> _handleLogoTap() async {
+    //final prefs = await SharedPreferences.getInstance();
+    //await prefs.clear();
     if (_isLoading || _clickCount >= _maxClickAttempts) return;
 
     setState(() => _isLoading = true);

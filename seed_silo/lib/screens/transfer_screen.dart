@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/screens/transfer_confirm_screen.dart';
 import 'package:seed_silo/widgets/formatted_amount_field.dart';
 
 class TransferScreen extends StatefulWidget {
   final Token token;
+  final Network network;
 
-  const TransferScreen({super.key, required this.token});
+  const TransferScreen({super.key, required this.token, required this.network});
 
   @override
   State<TransferScreen> createState() => _TransferScreenState();
@@ -35,6 +37,7 @@ class _TransferScreenState extends State<TransferScreen> {
       MaterialPageRoute(
         builder: (_) => TransferConfirmScreen(
           token: widget.token,
+          network: widget.network,
           destination: destination,
           amount: amount,
         ),
