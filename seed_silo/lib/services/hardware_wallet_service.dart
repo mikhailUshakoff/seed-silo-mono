@@ -36,18 +36,25 @@ class HardwareWalletService {
     return null;
   }
 
-  Uint8List _intTo2Bytes(int value) {
+  Uint8List _intToUint16(int value) {
     final bytes = ByteData(2);
     bytes.setUint16(0, value, Endian.big);
     return bytes.buffer.asUint8List();
   }
 
+  Uint8List _intToUint8(int value) {
+    final bytes = ByteData(1);
+    bytes.setUint8(0, value);
+    return bytes.buffer.asUint8List();
+  }
+
   Future<MsgSignature?> getSignature(
-      Uint8List password, Uint8List rawTransaction) async {
+      Uint8List password, int pos, Uint8List rawTransaction) async {
     final request = [getSignatureCmd];
     request.addAll(password);
     nullifyUint8List(password);
-    request.addAll(_intTo2Bytes(rawTransaction.length));
+    request.addAll(_intToUint8(pos));
+    request.addAll(_intToUint16(rawTransaction.length));
     request.addAll(rawTransaction);
 
     final ok = await SerialService().write(request);
@@ -76,10 +83,11 @@ class HardwareWalletService {
     return sig;
   }
 
-  Future<Uint8List?> getUncompressedPublicKey(Uint8List password) async {
+  Future<Uint8List?> getUncompressedPublicKey(Uint8List password, int pos) async {
     final request = [getUncompressedPublicKeyCmd];
     request.addAll(password);
     nullifyUint8List(password);
+    request.addAll(_intToUint8(pos));
     final ok = await SerialService().write(request);
     nullifyListInt(request);
     if (ok == null) return null;

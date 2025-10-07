@@ -28,7 +28,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordPosController =
-      TextEditingController(text: '1');
+      TextEditingController();
 
   String? _txHash;
   bool _isSubmitting = false;
@@ -58,10 +58,12 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     // Get wallet address
     final walletAddress = await TransactionService().getAddress(
       Uint8List.fromList(_passwordController.text.codeUnits),
+      int.parse(_passwordPosController.text),
     );
 
     if (walletAddress == null) {
       _passwordController.text = '';
+      _passwordPosController.text = '';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not receive wallet address')),
@@ -82,6 +84,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     if (bTx == null) {
       _passwordController.text = '';
+      _passwordPosController.text = '';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not build transaction')),
@@ -99,11 +102,13 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     final sendResult = await TransactionService().sendTransaction(
       Uint8List.fromList(_passwordController.text.codeUnits),
+      int.parse(_passwordPosController.text),
       widget.network.rpcUrl,
       _transaction!,
       _chainId!.toInt(),
     );
     _passwordController.text = '';
+    _passwordPosController.text = '';
     String txHash = sendResult ?? "0x";
 
     setState(() {
@@ -192,9 +197,19 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     enabled: _txHash == null && _isSubmitting == false,
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Please enter password position'
-                        : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter password position';
+                      }
+                      final position = int.tryParse(value);
+                      if (position == null) {
+                        return 'Please enter a valid number';
+                      }
+                      if (position < 0 || position > 224) { // 256 - 32
+                        return 'Password position must be between 0 and 224';
+                      }
+                      return null;
+                    },
                   ),
                 ],
               ),

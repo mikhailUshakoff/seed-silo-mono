@@ -11,6 +11,9 @@
 
 constexpr size_t MAX_MSG_LEN = 1024;
 
+#define STATUS_OK 0
+#define STATUS_ERR 1
+
 void error_response(uint8_t code) {
     Serial.write(&code, 1);
 }
@@ -35,9 +38,15 @@ void handle_get_pubkey_cmd() {
         return;
     }
 
+    byte pos;
+    if (Serial.readBytes(&pos, 1) != 1) {
+        error_response(ERROR_WRONG_DATA_FORMAT);
+        return;
+    }
+
     uint8_t private_key[32];
     uint8_t public_key[65] = {0};
-    decrypt_private_key(key, private_key);
+    decrypt_private_key(key, pos, private_key);
     secure_memzero(key, sizeof(key));
 
     int success = get_public_key(private_key, public_key);
@@ -55,9 +64,7 @@ void handle_get_pubkey_cmd() {
     Serial.write(response, sizeof(response));
 }
 
-#define STATUS_OK 0
-#define STATUS_ERR 1
-
+/*
 int decode_sign_data(uint8_t *out_private_key, uint8_t *out_message, uint16_t *out_msg_len) {
     uint8_t key[32];
     if (Serial.readBytes(key, 32) != 32) {
@@ -65,7 +72,13 @@ int decode_sign_data(uint8_t *out_private_key, uint8_t *out_message, uint16_t *o
         return STATUS_ERR;
     }
 
-    decrypt_private_key(key, out_private_key);
+    byte pos;
+    if (Serial.readBytes(&pos, 1) != 1) {
+        error_response(ERROR_WRONG_DATA_FORMAT);
+        return STATUS_ERR;
+    }
+
+    decrypt_private_key(key, pos, out_private_key);
     secure_memzero(key, sizeof(key));
 
     uint8_t len_bytes[2];
@@ -90,7 +103,7 @@ int decode_sign_data(uint8_t *out_private_key, uint8_t *out_message, uint16_t *o
 
     *out_msg_len = msg_len;
     return STATUS_OK;
-}
+}*/
 
 int sign_cmd_get_msg_signature(
     uint8_t* out_signature,
@@ -104,8 +117,14 @@ int sign_cmd_get_msg_signature(
         return STATUS_ERR;
     }
 
+    byte pos;
+    if (Serial.readBytes(&pos, 1) != 1) {
+        error_response(ERROR_WRONG_DATA_FORMAT);
+        return STATUS_ERR;
+    }
+
     uint8_t private_key[32];
-    decrypt_private_key(key, private_key);
+    decrypt_private_key(key, pos, private_key);
     secure_memzero(key, sizeof(key));
 
     uint8_t len_bytes[2];
