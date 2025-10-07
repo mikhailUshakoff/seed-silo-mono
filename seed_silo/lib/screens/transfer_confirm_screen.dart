@@ -28,7 +28,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordPosController =
-      TextEditingController(text: '1');
+      TextEditingController();
 
   String? _txHash;
   bool _isSubmitting = false;
@@ -63,6 +63,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     if (walletAddress == null) {
       _passwordController.text = '';
+      _passwordPosController.text = '';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not receive wallet address')),
@@ -83,6 +84,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     if (bTx == null) {
       _passwordController.text = '';
+      _passwordPosController.text = '';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not build transaction')),
@@ -106,6 +108,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
       _chainId!.toInt(),
     );
     _passwordController.text = '';
+    _passwordPosController.text = '';
     String txHash = sendResult ?? "0x";
 
     setState(() {

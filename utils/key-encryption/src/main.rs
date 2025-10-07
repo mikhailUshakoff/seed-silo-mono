@@ -7,7 +7,7 @@ use dotenv::dotenv;
 use std::env;
 use hex;
 
-const PLAINTEXT_LEN: usize = 128;
+const PLAINTEXT_LEN: usize = 256;
 const KEY_LEN: usize = 32;
 
 struct KeyInfo {
@@ -84,11 +84,13 @@ fn main() {
     let cipher = Cbc::<Aes256, Pkcs7>::new_from_slices(&key, &iv).unwrap();
     let ciphertext = cipher.encrypt_vec(&plaintext);
 
+    println!("#define DECRYPTED_DATA_LEN {}", PLAINTEXT_LEN);
+    println!("#define ENCRYPTED_DATA_LEN {}", ciphertext.len());
+
     // Print the results
     let iv_formatted: Vec<String> = iv.iter().map(|byte| format!("0x{:02x}", byte)).collect();
     println!("#define AES_IV_INITIALIZER {{{}}};", iv_formatted.join(", "));
     let chipertext_formatted: Vec<String> = ciphertext.iter().map(|byte| format!("0x{:02x}", byte)).collect();
     println!("#define ENCRYPTED_DATA_INITIALIZER {{{}}};", chipertext_formatted.join(", "));
-    println!("Ciphertext len: {}", chipertext_formatted.len());
 
 }
