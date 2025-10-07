@@ -23,7 +23,7 @@ void decrypt_private_key(uint8_t *key, byte pos, uint8_t *output) {
     mbedtls_aes_free(&aes);
 
     // Copy the relevant 32-byte segment to output
-    if (pos < 0 || pos > DECRYPTED_DATA_LEN - 32) {
+    if (pos > DECRYPTED_DATA_LEN - 32) {
         return;
     }
 

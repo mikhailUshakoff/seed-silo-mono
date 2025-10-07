@@ -1,18 +1,18 @@
 use aes::Aes256;
-use block_modes::{BlockMode, Cbc};
 use block_modes::block_padding::Pkcs7;
-use tiny_keccak::{Hasher, Keccak};
-use rand::Rng;
+use block_modes::{BlockMode, Cbc};
 use dotenv::dotenv;
-use std::env;
 use hex;
+use rand::Rng;
+use std::env;
+use tiny_keccak::{Hasher, Keccak};
 
 const PLAINTEXT_LEN: usize = 256;
 const KEY_LEN: usize = 32;
 
 struct KeyInfo {
     pub private_key: Vec<u8>,
-    pub position: usize
+    pub position: usize,
 }
 
 fn load_keys() -> Vec<KeyInfo> {
@@ -25,24 +25,31 @@ fn load_keys() -> Vec<KeyInfo> {
         }
         let parts: Vec<&str> = pair_str.split(',').collect();
         if parts.len() != 2 {
-            panic!("Invalid PRIVATE_KEYS format at index:{}",i);
+            panic!("Invalid PRIVATE_KEYS format at index: {}", i);
         }
 
         let private_key_hex = parts[0].trim();
         let private_key = hex::decode(private_key_hex.trim_start_matches("0x"))
-            .expect(format!("Invalid hex in private key at index:{}",i).as_str());
+            .expect(format!("Invalid hex in private key at index: {}", i).as_str());
 
         if private_key.len() != KEY_LEN {
-            panic!("Invalid private key length: {} at index:{}", private_key.len(),i);
+            panic!(
+                "Invalid private key length: {} at index: {}",
+                private_key.len(),
+                i
+            );
         }
 
         let position: usize = parts[1].trim().parse().expect("Invalid position");
 
         if position + KEY_LEN > PLAINTEXT_LEN {
-            panic!("Invalid key position: {} at index:{}", position,i);
+            panic!("Invalid key position: {} at index: {}", position, i);
         }
 
-        pairs.push(KeyInfo{private_key, position});
+        pairs.push(KeyInfo {
+            private_key,
+            position,
+        });
     }
 
     pairs
@@ -57,15 +64,14 @@ fn main() {
     // Get the encryption key from the environment
     let encryption_key = env::var("ENCRYPTION_KEY").expect("ENCRYPTION_KEY must be set");
 
-
     // Hash the encryption key using Keccak-256 to derive a 32-byte key
     let mut hasher = Keccak::v256(); // Initialize Keccak-256 hasher
     let mut hash_result = [0u8; 32]; // Keccak-256 produces a 32-byte hash
     hasher.update(encryption_key.as_bytes()); // Update with the key bytes
     hasher.finalize(&mut hash_result); // Finalize and store the result
     let key: [u8; 32] = hash_result; // Convert to 32-byte array
-    //let key_formatted: Vec<String> = key.iter().map(|byte| format!("0x{:02x}", byte)).collect();
-    //println!("key_formatted: [{}]",key_formatted.join(", "));
+                                     //let key_formatted: Vec<String> = key.iter().map(|byte| format!("0x{:02x}", byte)).collect();
+                                     //println!("key_formatted: [{}]",key_formatted.join(", "));
 
     // Generate a random IV (16 bytes for AES-256-CBC)
     let iv: [u8; 16] = rand::thread_rng().gen();
@@ -90,7 +96,12 @@ fn main() {
     // Print the results
     let iv_formatted: Vec<String> = iv.iter().map(|byte| format!("0x{:02x}", byte)).collect();
     println!("#define AES_IV_INITIALIZER {{{}}}", iv_formatted.join(", "));
-    let chipertext_formatted: Vec<String> = ciphertext.iter().map(|byte| format!("0x{:02x}", byte)).collect();
-    println!("#define ENCRYPTED_DATA_INITIALIZER {{{}}}", chipertext_formatted.join(", "));
-
+    let ciphertext_formatted: Vec<String> = ciphertext
+        .iter()
+        .map(|byte| format!("0x{:02x}", byte))
+        .collect();
+    println!(
+        "#define ENCRYPTED_DATA_INITIALIZER {{{}}}",
+        ciphertext_formatted.join(", ")
+    );
 }
