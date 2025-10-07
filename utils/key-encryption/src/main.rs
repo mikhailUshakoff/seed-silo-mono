@@ -30,7 +30,7 @@ fn load_keys() -> Vec<KeyInfo> {
 
         let private_key_hex = parts[0].trim();
         let private_key = hex::decode(private_key_hex.trim_start_matches("0x"))
-            .expect(format!("Invalid hex in private key at index: {}", i).as_str());
+            .unwrap_or_else(|_| panic!("Invalid hex in private key at index: {}", i));
 
         if private_key.len() != KEY_LEN {
             panic!(
