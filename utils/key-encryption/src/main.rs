@@ -64,8 +64,8 @@ fn main() {
     hasher.update(encryption_key.as_bytes()); // Update with the key bytes
     hasher.finalize(&mut hash_result); // Finalize and store the result
     let key: [u8; 32] = hash_result; // Convert to 32-byte array
-    let key_formatted: Vec<String> = key.iter().map(|byte| format!("0x{:02x}", byte)).collect();
-    println!("key_formatted: [{}]",key_formatted.join(", "));
+    //let key_formatted: Vec<String> = key.iter().map(|byte| format!("0x{:02x}", byte)).collect();
+    //println!("key_formatted: [{}]",key_formatted.join(", "));
 
     // Generate a random IV (16 bytes for AES-256-CBC)
     let iv: [u8; 16] = rand::thread_rng().gen();
@@ -86,9 +86,9 @@ fn main() {
 
     // Print the results
     let iv_formatted: Vec<String> = iv.iter().map(|byte| format!("0x{:02x}", byte)).collect();
-    println!("IV: [{}]", iv_formatted.join(", "));
+    println!("#define AES_IV_INITIALIZER {{{}}};", iv_formatted.join(", "));
     let chipertext_formatted: Vec<String> = ciphertext.iter().map(|byte| format!("0x{:02x}", byte)).collect();
+    println!("#define ENCRYPTED_DATA_INITIALIZER {{{}}};", chipertext_formatted.join(", "));
     println!("Ciphertext len: {}", chipertext_formatted.len());
-    println!("Ciphertext: [{}]", chipertext_formatted.join(", "));
 
 }

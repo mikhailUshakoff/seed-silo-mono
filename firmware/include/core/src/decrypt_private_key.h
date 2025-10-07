@@ -29,6 +29,6 @@ void decrypt_private_key(uint8_t *key, byte pos, uint8_t *output) {
         return;
     }
 
-    memcpy(output, decrypted_data + pos * 32, 32);
+    memcpy(output, decrypted_data + pos, 32);
 
 }

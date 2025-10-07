@@ -58,6 +58,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     // Get wallet address
     final walletAddress = await TransactionService().getAddress(
       Uint8List.fromList(_passwordController.text.codeUnits),
+      int.parse(_passwordPosController.text),
     );
 
     if (walletAddress == null) {
@@ -99,6 +100,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
 
     final sendResult = await TransactionService().sendTransaction(
       Uint8List.fromList(_passwordController.text.codeUnits),
+      int.parse(_passwordPosController.text),
       widget.network.rpcUrl,
       _transaction!,
       _chainId!.toInt(),
@@ -192,9 +194,19 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     enabled: _txHash == null && _isSubmitting == false,
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Please enter password position'
-                        : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter password position';
+                      }
+                      final position = int.tryParse(value);
+                      if (position == null) {
+                        return 'Please enter a valid number';
+                      }
+                      if (position < 0 || position > 224) { // 256 - 32
+                        return 'Password position must be between 0 and 224';
+                      }
+                      return null;
+                    },
                   ),
                 ],
               ),
