@@ -4,9 +4,8 @@
 #include <mbedtls/aes.h>
 //#include <uECC.h> // Micro-ECC library
 //#include <KeccakCore.h>
-#include <input.h>
+//#include <input.h>
 
-#include "constants.h"
 #include <core/command_handlers.h>
 
 TFT_eSPI tft = TFT_eSPI();
@@ -140,7 +139,7 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
     if (len < 2 || tx[0] != 0x02) {
         tft.drawString("Not a type-2 tx", 10, 15);
         print_hex_tft("tx", tx, len, 10, 30);
-        return STATUS_ERR;
+        return CORE_ERR_NOT_TYPE2_TX;
     }
 
     const uint8_t *rlp = tx + 1;
@@ -149,12 +148,12 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
     size_t list_len = 0, list_offset = 0;
     if (rlp_read_length(rlp, rlp_len, &list_len, &list_offset) != 0) {
         tft.drawString("RLP list parse fail", 10, 15);
-        return STATUS_ERR;
+        return CORE_ERR_RLP_LIST_PARSE;
     }
 
     if (list_offset + list_len > rlp_len) {
         tft.drawString("RLP list length invalid", 10, 15);
-        return STATUS_ERR;
+        return CORE_ERR_RLP_LIST_LENGTH;
     }
 
     const uint8_t *p = rlp + list_offset;
@@ -175,7 +174,7 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
         const uint8_t *field = rlp_read_item(p, remaining, &field_len, &consumed);
         if (!field) {
             tft.drawString("RLP field parse fail", x, y);
-            return STATUS_ERR;
+            return CORE_ERR_RLP_FIELD_PARSE;
         }
 
         if (i == 0) {
@@ -183,7 +182,7 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
         } else if (i == 7 && field_len > 0) {
             if (field_len != 4 + 32 + 32 || memcmp(field, "\xa9\x05\x9c\xbb", 4) != 0) {
                 tft.drawString("Not EIP-20 transfer", x, y);
-                return STATUS_ERR;
+                return CORE_ERR_NOT_EIP20_TRANSFER;
             }
             const uint8_t *to_address = field + 4 + 12; // skip function selector + padding
             const uint8_t *amount = field + 4 + 32;
@@ -217,7 +216,7 @@ int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
         print_hex_tft("remaining", p, remaining, x, y);
     }
 
-    return STATUS_OK;
+    return CORE_SUCCESS;
 }
 
 void drawSignConfirmationUI() {
@@ -255,10 +254,7 @@ void loop() { //...............................................................l
         // clear screen
         tft.fillScreen(TFT_BLACK);
         tft.drawString("TX Approved",10,10);
-        int result = sign_cmd_response(signature, rec_id);
-        if (result != STATUS_OK) {
-            tft.drawString("Wrong Recovery ID",10,20);
-        }
+        sign_cmd_response(signature, rec_id);
         secure_memzero(signature, 64);
         rec_id = 0;
     }
@@ -270,7 +266,7 @@ void loop() { //...............................................................l
         secure_memzero(signature, 64);
         rec_id = 0;
         tft.drawString("TX Rejected",10,10);
-        uint8_t response = RESPONSE_FAIL;
+        uint8_t response = CORE_ERR_TX_REJECTED;
         Serial.write(&response, 1);
     }
 
@@ -307,10 +303,16 @@ void loop() { //...............................................................l
                         message,
                         &msg_len
                     );
-                    if (result != STATUS_OK) return;
+                    if (result != CORE_SUCCESS) {
+                        error_response(result);
+                        return;
+                    }
 
                     result = parse_eip1559_tx(message, msg_len);
-                    if (result != STATUS_OK) return;
+                    if (result != CORE_SUCCESS) {
+                        error_response(result);
+                        return;
+                    }
 
                     bSignConfirmationScreen = true;
 
@@ -321,7 +323,7 @@ void loop() { //...............................................................l
                 default:
                 {
                     tft.drawString("CMD: unknown",10,30);
-                    uint8_t response_err = ERROR_WRONG_CMD;
+                    uint8_t response_err = CORE_ERR_UNKNOWN_CMD;
                     Serial.write(&response_err, 1);
                 }
             }
