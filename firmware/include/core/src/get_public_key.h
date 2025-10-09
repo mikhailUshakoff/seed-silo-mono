@@ -1,4 +1,4 @@
-#include "secp256k1_recovery.h"
+#include "secp256k1_c.h"
 #include "../constants.h"
 
 // get uncompressed public key
