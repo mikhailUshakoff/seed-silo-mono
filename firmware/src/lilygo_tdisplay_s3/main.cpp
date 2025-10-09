@@ -1,10 +1,4 @@
 #include <TFT_eSPI.h>
-//#include <SHA256.h>
-#include <stdio.h>
-#include <mbedtls/aes.h>
-//#include <uECC.h> // Micro-ECC library
-//#include <KeccakCore.h>
-//#include <input.h>
 
 #include <core/command_handlers.h>
 
