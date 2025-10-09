@@ -15,6 +15,8 @@ class HardwareWalletService {
   static const int getUncompressedPublicKeyCmd = 0x02;
   static const int getSignatureCmd = 0x03;
 
+  static const int successCode = 0x00;
+
   static const Duration readTimeout = Duration(milliseconds: 500);
 
   Future<int?> getVersion() async {
@@ -29,7 +31,7 @@ class HardwareWalletService {
 
     SerialService().close();
 
-    if (buffer.length == 1 && buffer[0] == 0xF0) {
+    if (buffer.length == 1 && buffer[0] == successCode) {
       return 1;
     }
 
@@ -69,7 +71,7 @@ class HardwareWalletService {
 
     SerialService().close();
 
-    if (buffer.length != 66 || buffer[0] != 0xF0) {
+    if (buffer.length != 66 || buffer[0] != successCode) {
       return null;
     }
 
@@ -100,7 +102,7 @@ class HardwareWalletService {
 
     SerialService().close();
 
-    if (buffer.length == 66 || buffer[0] == 0xF0) {
+    if (buffer.length == 66 || buffer[0] == successCode) {
       return buffer.sublist(2);
     }
 
