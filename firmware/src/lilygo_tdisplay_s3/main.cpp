@@ -1,5 +1,4 @@
 #include <TFT_eSPI.h>
-
 #include <core/command_handlers.h>
 
 TFT_eSPI tft = TFT_eSPI();

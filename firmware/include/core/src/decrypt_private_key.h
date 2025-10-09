@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <mbedtls/aes.h>
 #include "../input.h"
 #include "../constants.h"

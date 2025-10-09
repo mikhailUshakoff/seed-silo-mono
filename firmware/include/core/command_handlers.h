@@ -1,8 +1,3 @@
-#include <TFT_eSPI.h>
-#include <mbedtls/aes.h>
-#include <uECC.h>
-#include <KeccakCore.h>
-
 #include "constants.h"
 #include "src/decrypt_private_key.h"
 #include "src/get_public_key.h"

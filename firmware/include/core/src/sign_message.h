@@ -1,5 +1,3 @@
-#include <cstdint>
-
 #include "secp256k1_recovery.h"
 #include "secp256k1_c.h"
 #include "module/recovery/main_impl.h"
