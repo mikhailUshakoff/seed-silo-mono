@@ -23,14 +23,13 @@ class HardwareWalletService {
   static const int getUncompressedPublicKeyCmd = 0x02;
   static const int getSignatureCmd = 0x03;
 
-  static const int successCode = 0xFF;
+  static const int successCode = 0x01;
 
   static const Duration readTimeout = Duration(milliseconds: 500);
 
   Future<Version?> getVersion() async {
     final ok = await SerialService().write([getVersionCmd]);
     if (ok == null) return null;
-
     Uint8List? buffer;
     while (buffer == null || buffer.isEmpty) {
       await Future.delayed(readTimeout);
@@ -38,14 +37,11 @@ class HardwareWalletService {
     }
     if (buffer.length == 1 && buffer[0] == successCode) {
       buffer = await SerialService().read(3);
+      SerialService().close();
       if (buffer != null && buffer.length == 3) {
         return Version(buffer[0], buffer[1], buffer[2]);
       }
-      return null;
     }
-
-    SerialService().close();
-
     return null;
   }
 
