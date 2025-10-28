@@ -5,8 +5,12 @@
     #define CMD_GET_PUBKEY 0x02
     #define CMD_SIGN 0x03
 
+    #define VERSION_MAJOR 0x00
+    #define VERSION_MINOR 0x01
+    #define VERSION_PATCH 0x00
+
     // Universal error codes for crypto operations
-    #define CORE_SUCCESS                0x00 // Operation completed successfully
+    #define CORE_SUCCESS                0xFF // Operation completed successfully
     #define CORE_ERR_UNKNOWN_CMD        0x01 // Unrecognized command
     #define CORE_ERR_WRONG_DATA_FORMAT  0x02 // Input data format is incorrect
     #define CORE_ERR_WRONG_RECOVERY_ID  0x03 // Recovery ID is out of valid range

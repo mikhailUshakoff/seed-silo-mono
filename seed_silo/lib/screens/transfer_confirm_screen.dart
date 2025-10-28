@@ -27,8 +27,7 @@ class TransferConfirmScreen extends StatefulWidget {
 class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _passwordPosController =
-      TextEditingController();
+  final TextEditingController _passwordPosController = TextEditingController();
 
   String? _txHash;
   bool _isSubmitting = false;
@@ -205,7 +204,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                       if (position == null) {
                         return 'Please enter a valid number';
                       }
-                      if (position < 0 || position > 224) { // 256 - 32
+                      if (position < 0 || position > 224) {
+                        // 256 - 32
                         return 'Password position must be between 0 and 224';
                       }
                       return null;

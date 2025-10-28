@@ -18,8 +18,13 @@ void secure_memzero(volatile void* ptr, size_t len) {
 }
 
 void handle_get_version_cmd() {
-    uint8_t response = CORE_SUCCESS;
-    Serial.write(&response, 1);
+    uint8_t response[4] = {
+        CORE_SUCCESS,
+        VERSION_MAJOR,
+        VERSION_MINOR,
+        VERSION_PATCH
+    };
+    Serial.write(response, sizeof(response));
 }
 
 void handle_get_pubkey_cmd() {
