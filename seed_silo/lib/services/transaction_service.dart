@@ -146,8 +146,8 @@ class TransactionService {
     return buffer.toString();
   }
 
-  Future<String?> sendTransaction(Uint8List textPassword, int posPassword, String rpcUrl,
-      Transaction tx, int chainId) async {
+  Future<String?> sendTransaction(Uint8List textPassword, int posPassword,
+      String rpcUrl, Transaction tx, int chainId) async {
     if (!tx.isEIP1559) {
       nullifyUint8List(textPassword);
       return null;
@@ -157,8 +157,8 @@ class TransactionService {
     nullifyUint8List(textPassword);
 
     final rawTransaction = tx.getUnsignedSerialized(chainId: chainId);
-    final sig =
-        await HardwareWalletService().getSignature(password, posPassword, rawTransaction);
+    final sig = await HardwareWalletService()
+        .getSignature(password, posPassword, rawTransaction);
     if (sig == null) {
       return null;
     }
@@ -178,8 +178,8 @@ class TransactionService {
   Future<String?> getAddress(Uint8List textPassword, int posPassword) async {
     final password = keccak256(textPassword);
     nullifyUint8List(textPassword);
-    final publicKey =
-        await HardwareWalletService().getUncompressedPublicKey(password, posPassword);
+    final publicKey = await HardwareWalletService()
+        .getUncompressedPublicKey(password, posPassword);
 
     return publicKey == null
         ? null

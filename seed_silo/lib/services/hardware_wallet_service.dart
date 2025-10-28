@@ -4,6 +4,14 @@ import 'package:seed_silo/services/serial_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/crypto.dart';
 
+class Version {
+  final int major;
+  final int minor;
+  final int patch;
+
+  Version(this.major, this.minor, this.patch);
+}
+
 class HardwareWalletService {
   static final HardwareWalletService _instance =
       HardwareWalletService._internal();
@@ -15,26 +23,25 @@ class HardwareWalletService {
   static const int getUncompressedPublicKeyCmd = 0x02;
   static const int getSignatureCmd = 0x03;
 
-  static const int successCode = 0x00;
+  static const int successCode = 0x01;
 
   static const Duration readTimeout = Duration(milliseconds: 500);
 
-  Future<int?> getVersion() async {
+  Future<Version?> getVersion() async {
     final ok = await SerialService().write([getVersionCmd]);
     if (ok == null) return null;
-
     Uint8List? buffer;
     while (buffer == null || buffer.isEmpty) {
       await Future.delayed(readTimeout);
       buffer = await SerialService().read(1);
     }
-
-    SerialService().close();
-
     if (buffer.length == 1 && buffer[0] == successCode) {
-      return 1;
+      buffer = await SerialService().read(3);
+      SerialService().close();
+      if (buffer != null && buffer.length == 3) {
+        return Version(buffer[0], buffer[1], buffer[2]);
+      }
     }
-
     return null;
   }
 
@@ -85,7 +92,8 @@ class HardwareWalletService {
     return sig;
   }
 
-  Future<Uint8List?> getUncompressedPublicKey(Uint8List password, int pos) async {
+  Future<Uint8List?> getUncompressedPublicKey(
+      Uint8List password, int pos) async {
     final request = [getUncompressedPublicKeyCmd];
     request.addAll(password);
     nullifyUint8List(password);
@@ -102,7 +110,7 @@ class HardwareWalletService {
 
     SerialService().close();
 
-    if (buffer.length == 66 || buffer[0] == successCode) {
+    if (buffer.length == 66 && buffer[0] == successCode) {
       return buffer.sublist(2);
     }
 
