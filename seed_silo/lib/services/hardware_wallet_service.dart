@@ -110,7 +110,7 @@ class HardwareWalletService {
 
     SerialService().close();
 
-    if (buffer.length == 66 || buffer[0] == successCode) {
+    if (buffer.length == 66 && buffer[0] == successCode) {
       return buffer.sublist(2);
     }
 
