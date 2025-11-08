@@ -1,11 +1,11 @@
 import 'package:convert/convert.dart';
+import 'package:eip1559/eip1559.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:wallet/wallet.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
-import 'package:eip1559/eip1559.dart' as eip1559;
 
 /// rewardPercentileIndex is an integer that represents which percentile of priority fees
 /// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
@@ -231,9 +231,16 @@ class TransactionService {
     final dstAddress = EthereumAddress.fromHex(dst);
     final nonce = await ethClient.getTransactionCount(sender);
 
-    // TODO implement better web3dart EIP-1559 gas fetching
-    //final gasInEIP1559 = await ethClient.getGasInEIP1559();
-    final gasInEIP1559 = await eip1559.getGasInEIP1559(rpcUrl, block: 'latest');
+    // Try to get gas fees in EIP1559 format
+    // This can fail if the RPC doesn't support fetching blocks by `pending` flag
+    //  In case of error try to use diffrent RPC
+    final List<Fee> gasInEIP1559;
+    try {
+      gasInEIP1559 = await ethClient.getGasInEIP1559();
+    } catch (e) {
+      return null;
+    }
+
     if (gasInEIP1559.length != 3) {
       return null;
     }
