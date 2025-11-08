@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:seed_silo/services/serial_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
-import 'package:web3dart/crypto.dart';
+import 'package:web3dart/web3dart.dart';
 
 class Version {
   final int major;

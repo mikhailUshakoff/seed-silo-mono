@@ -5,6 +5,7 @@ import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/models/add_token_result.dart';
 import 'package:seed_silo/models/remove_token_result.dart';
 
+import 'package:wallet/wallet.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart';
 

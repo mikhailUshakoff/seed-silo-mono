@@ -1,10 +1,12 @@
 import 'package:convert/convert.dart';
+import 'package:eip1559/eip1559.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
-import 'package:web3dart/crypto.dart';
+import 'package:wallet/wallet.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
+import "package:eip1559/eip1559.dart" as eip1559;
 
 /// rewardPercentileIndex is an integer that represents which percentile of priority fees
 /// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
@@ -53,8 +55,9 @@ class TransactionService {
     ];
 
     if (transaction.to != null) {
-      list.add(transaction.to!.addressBytes);
+      list.add(hex.decode(transaction.to!.without0x));
     } else {
+      // TODO throw error?
       list.add('');
     }
 
@@ -99,7 +102,7 @@ class TransactionService {
     final value = decoded.data[1] as BigInt;
 
     final str = convert2Decimal(value, decimals);
-    return '    Function: $functionName\n    To: 0x${to.hex}\n    Amount (wei): 0x${value.toRadixString(16)} ($str)';
+    return '    Function: $functionName\n    To: 0x${to.without0x}\n    Amount (wei): 0x${value.toRadixString(16)} ($str)';
   }
 
   String convert2Decimal(BigInt value, int decimals) {
@@ -229,7 +232,19 @@ class TransactionService {
     final dstAddress = EthereumAddress.fromHex(dst);
     final nonce = await ethClient.getTransactionCount(sender);
 
-    final gasInEIP1559 = await ethClient.getGasInEIP1559();
+    // Try to get gas fees in EIP1559 format
+    // This can fail if the RPC doesn't support fetching blocks by `pending` flag
+    //  In case of error try to use diffrent RPC
+    final List<Fee> gasInEIP1559;
+    try {
+      // Pending block doesn't work for ZkSync RPC providers
+      // TODO test eth_getBlockByNumber with 'pending' block on ZkSync mainnet RPCs
+      // gasInEIP1559 = await ethClient.getGasInEIP1559();
+      gasInEIP1559 = await eip1559.getGasInEIP1559(rpcUrl, block: 'latest');
+    } catch (e) {
+      return null;
+    }
+
     if (gasInEIP1559.length != 3) {
       return null;
     }
@@ -241,10 +256,19 @@ class TransactionService {
     if (isEthToken(token)) {
       // Build ETH transfer
       final value = EtherAmount.fromBase10String(EtherUnit.wei, amount);
+      // We need to estimate gas limit for ETH transfer because of ZkSync
+      // ZkSync requires higher gas limit than the standard 21000 for ETH transfer
+      final gasLimit = await ethClient.estimateGas(
+        sender: sender,
+        to: dstAddress,
+        value: value,
+        maxFeePerGas: maxFeePerGas,
+        maxPriorityFeePerGas: maxPriorityFeePerGas,
+      );
       return Transaction(
         to: dstAddress,
         value: value,
-        maxGas: 21000, // Standard ETH transfer gas limit
+        maxGas: gasLimit.toInt(),
         nonce: nonce,
         maxFeePerGas: maxFeePerGas,
         maxPriorityFeePerGas: maxPriorityFeePerGas,
