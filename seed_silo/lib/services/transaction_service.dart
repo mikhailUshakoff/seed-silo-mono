@@ -6,6 +6,7 @@ import 'package:seed_silo/utils/nullify.dart';
 import 'package:wallet/wallet.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:http/http.dart' as http;
+import "package:eip1559/eip1559.dart" as eip1559;
 
 /// rewardPercentileIndex is an integer that represents which percentile of priority fees
 /// to use when calculating the gas fees for the transaction. In EIP-1559, priority fees
@@ -236,7 +237,10 @@ class TransactionService {
     //  In case of error try to use diffrent RPC
     final List<Fee> gasInEIP1559;
     try {
-      gasInEIP1559 = await ethClient.getGasInEIP1559();
+      // Pending block doesn't work for ZkSync RPC providers
+      // TODO test eth_getBlockByNumber with 'pending' block on ZkSync mainnet RPCs
+      // gasInEIP1559 = await ethClient.getGasInEIP1559();
+      gasInEIP1559 = await eip1559.getGasInEIP1559(rpcUrl, block: 'latest');
     } catch (e) {
       return null;
     }
