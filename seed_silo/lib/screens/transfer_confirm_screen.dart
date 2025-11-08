@@ -164,7 +164,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         Text(
                             'Gas limit: 0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? TransactionService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
                         Text('------------'),
-                        Text('To: ${_transaction!.to?.hex ?? "null"}'),
+                        Text('To: ${_transaction!.to?.with0x ?? "null"}'),
                         Text(
                             'Value (in wei): 0x${_transaction!.value?.getInWei.toRadixString(16) ?? "null"}'),
                         Text(
