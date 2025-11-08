@@ -40,39 +40,44 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ...networks.map((network) {
-                final isActive = network == currentNetwork;
-                return ListTile(
-                  leading: Radio<Network>(
-                    value: network,
-                    groupValue: currentNetwork,
-                    onChanged: (value) async {
-                      if (value != null) {
-                        await networkProvider.setCurrentNetwork(value.chainId);
-                        widget.onNetworkChanged();
-                        if (mounted) {
-                          Navigator.pop(context);
-                        }
-                      }
-                    },
-                  ),
-                  title: Text(network.name),
-                  subtitle: Text('Chain ID: ${network.chainId}'),
-                  trailing: isActive
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: isActive
-                      ? null
-                      : () async {
-                          await networkProvider
-                              .setCurrentNetwork(network.chainId);
-                          widget.onNetworkChanged();
-                          if (mounted) {
-                            Navigator.pop(context);
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: networks.map((network) {
+                    final isActive = network == currentNetwork;
+                    return ListTile(
+                      leading: Radio<Network>(
+                        value: network,
+                        groupValue: currentNetwork,
+                        onChanged: (value) async {
+                          if (value != null) {
+                            await networkProvider.setCurrentNetwork(value.chainId);
+                            widget.onNetworkChanged();
+                            if (mounted) {
+                              Navigator.pop(context);
+                            }
                           }
                         },
-                );
-              }),
+                      ),
+                      title: Text(network.name),
+                      subtitle: Text('Chain ID: ${network.chainId}'),
+                      trailing: isActive
+                          ? const Icon(Icons.check, color: Colors.green)
+                          : null,
+                      onTap: isActive
+                          ? null
+                          : () async {
+                              await networkProvider
+                                  .setCurrentNetwork(network.chainId);
+                              widget.onNetworkChanged();
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                            },
+                    );
+                  }).toList(),
+                ),
+              ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.settings),
