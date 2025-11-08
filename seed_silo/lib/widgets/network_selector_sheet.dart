@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 
-class NetworkSelectorSheet extends StatefulWidget {
+class NetworkSelectorSheet extends StatelessWidget {
   final VoidCallback onNetworkChanged;
   final VoidCallback onManageNetworks;
 
@@ -13,13 +13,29 @@ class NetworkSelectorSheet extends StatefulWidget {
     required this.onManageNetworks,
   });
 
-  @override
-  State<NetworkSelectorSheet> createState() => _NetworkSelectorSheetState();
-}
+  void _scrollToSelectedNetwork(ScrollController controller, List<Network> networks, Network? currentNetwork) {
+    if (currentNetwork != null) {
+      final index = networks.indexOf(currentNetwork);
+      if (index != -1) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (controller.hasClients) {
+            // Each ListTile is approximately 72 pixels high
+            final position = index * 72.0;
+            controller.animateTo(
+              position,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          }
+        });
+      }
+    }
+  }
 
-class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
   @override
   Widget build(BuildContext context) {
+    final scrollController = ScrollController();
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Consumer<NetworkProvider>(
@@ -32,6 +48,8 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          _scrollToSelectedNetwork(scrollController, networks, currentNetwork);
+
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -42,6 +60,7 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
               const SizedBox(height: 16),
               Flexible(
                 child: ListView(
+                  controller: scrollController,
                   shrinkWrap: true,
                   children: networks.map((network) {
                     final isActive = network == currentNetwork;
@@ -52,10 +71,8 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                         onChanged: (value) async {
                           if (value != null) {
                             await networkProvider.setCurrentNetwork(value.chainId);
-                            widget.onNetworkChanged();
-                            if (mounted) {
-                              Navigator.pop(context);
-                            }
+                            onNetworkChanged();
+                            Navigator.pop(context);
                           }
                         },
                       ),
@@ -69,10 +86,8 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                           : () async {
                               await networkProvider
                                   .setCurrentNetwork(network.chainId);
-                              widget.onNetworkChanged();
-                              if (mounted) {
-                                Navigator.pop(context);
-                              }
+                              onNetworkChanged();
+                              Navigator.pop(context);
                             },
                     );
                   }).toList(),
@@ -84,7 +99,7 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                 title: const Text('Manage Networks'),
                 onTap: () {
                   Navigator.pop(context);
-                  widget.onManageNetworks();
+                  onManageNetworks();
                 },
               ),
             ],
