@@ -9,7 +9,7 @@ Seed Silo is a hardware wallet designed to provide secure storage and management
 ## Tested Networks
 - Arbitrum
 - Base
-- Ethereum`
+- Ethereum
 - Linea
 - Optimism
 - Scroll
