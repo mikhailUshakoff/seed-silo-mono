@@ -73,7 +73,7 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              Expanded(
+              Flexible(
                 child: ListView(
                   children: networks.map((network) {
                     final isActive = network == currentNetwork;
