@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 
-class NetworkSelectorSheet extends StatelessWidget {
+class NetworkSelectorSheet extends StatefulWidget {
   final VoidCallback onNetworkChanged;
   final VoidCallback onManageNetworks;
 
@@ -13,19 +13,40 @@ class NetworkSelectorSheet extends StatelessWidget {
     required this.onManageNetworks,
   });
 
-  void _scrollToSelectedNetwork(ScrollController controller, List<Network> networks, Network? currentNetwork) {
-    if (currentNetwork != null) {
+  @override
+  State<NetworkSelectorSheet> createState() => _NetworkSelectorSheetState();
+}
+
+class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
+  late ScrollController _scrollController;
+  bool _hasScrolledToSelected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSelectedNetwork(List<Network> networks, Network? currentNetwork) {
+    if (currentNetwork != null && !_hasScrolledToSelected) {
       final index = networks.indexOf(currentNetwork);
       if (index != -1) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (controller.hasClients) {
+          if (_scrollController.hasClients && mounted) {
             // Each ListTile is approximately 72 pixels high
             final position = index * 72.0;
-            controller.animateTo(
+            _scrollController.animateTo(
               position,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );
+            _hasScrolledToSelected = true;
           }
         });
       }
@@ -34,8 +55,6 @@ class NetworkSelectorSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scrollController = ScrollController();
-
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Consumer<NetworkProvider>(
@@ -48,7 +67,7 @@ class NetworkSelectorSheet extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          _scrollToSelectedNetwork(scrollController, networks, currentNetwork);
+          _scrollToSelectedNetwork(networks, currentNetwork);
 
           return Column(
             mainAxisSize: MainAxisSize.min,
@@ -60,7 +79,7 @@ class NetworkSelectorSheet extends StatelessWidget {
               const SizedBox(height: 16),
               Flexible(
                 child: ListView(
-                  controller: scrollController,
+                  controller: _scrollController,
                   shrinkWrap: true,
                   children: networks.map((network) {
                     final isActive = network == currentNetwork;
@@ -71,8 +90,10 @@ class NetworkSelectorSheet extends StatelessWidget {
                         onChanged: (value) async {
                           if (value != null) {
                             await networkProvider.setCurrentNetwork(value.chainId);
-                            onNetworkChanged();
-                            Navigator.pop(context);
+                            widget.onNetworkChanged();
+                            if (mounted) {
+                              Navigator.pop(context);
+                            }
                           }
                         },
                       ),
@@ -86,8 +107,10 @@ class NetworkSelectorSheet extends StatelessWidget {
                           : () async {
                               await networkProvider
                                   .setCurrentNetwork(network.chainId);
-                              onNetworkChanged();
-                              Navigator.pop(context);
+                              widget.onNetworkChanged();
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
                             },
                     );
                   }).toList(),
@@ -99,7 +122,7 @@ class NetworkSelectorSheet extends StatelessWidget {
                 title: const Text('Manage Networks'),
                 onTap: () {
                   Navigator.pop(context);
-                  onManageNetworks();
+                  widget.onManageNetworks();
                 },
               ),
             ],
