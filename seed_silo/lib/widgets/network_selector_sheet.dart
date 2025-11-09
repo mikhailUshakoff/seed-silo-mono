@@ -18,12 +18,11 @@ class NetworkSelectorSheet extends StatefulWidget {
 }
 
 class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
-  late ScrollController _scrollController;
+  final Map<Network, GlobalKey> _networkKeys = {};
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
 
     // Scroll to selected network after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -31,24 +30,15 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
     });
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   void _scrollToSelectedNetwork() {
     final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
-    final networks = networkProvider.networks;
     final currentNetwork = networkProvider.currentNetwork;
 
-    if (currentNetwork != null && _scrollController.hasClients && mounted) {
-      final index = networks.indexOf(currentNetwork);
-      if (index != -1) {
-        // Each ListTile is approximately 72 pixels high
-        final position = index * 72.0;
-        _scrollController.animateTo(
-          position,
+    if (mounted) {
+      final key = _networkKeys[currentNetwork];
+      if (key?.currentContext != null) {
+        Scrollable.ensureVisible(
+          key!.currentContext!,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
@@ -70,6 +60,11 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          // Create keys for networks if not already created
+          for (final network in networks) {
+            _networkKeys.putIfAbsent(network, () => GlobalKey());
+          }
+
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -80,11 +75,11 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
               const SizedBox(height: 16),
               Flexible(
                 child: ListView(
-                  controller: _scrollController,
                   shrinkWrap: true,
                   children: networks.map((network) {
                     final isActive = network == currentNetwork;
                     return ListTile(
+                      key: _networkKeys[network],
                       leading: Radio<Network>(
                         value: network,
                         groupValue: currentNetwork,
