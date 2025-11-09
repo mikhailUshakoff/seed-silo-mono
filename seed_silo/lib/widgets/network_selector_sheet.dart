@@ -19,12 +19,16 @@ class NetworkSelectorSheet extends StatefulWidget {
 
 class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
   late ScrollController _scrollController;
-  bool _hasScrolledToSelected = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+
+    // Scroll to selected network after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedNetwork();
+    });
   }
 
   @override
@@ -33,22 +37,21 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
     super.dispose();
   }
 
-  void _scrollToSelectedNetwork(List<Network> networks, Network? currentNetwork) {
-    if (currentNetwork != null && !_hasScrolledToSelected) {
+  void _scrollToSelectedNetwork() {
+    final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
+    final networks = networkProvider.networks;
+    final currentNetwork = networkProvider.currentNetwork;
+
+    if (currentNetwork != null && _scrollController.hasClients && mounted) {
       final index = networks.indexOf(currentNetwork);
       if (index != -1) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients && mounted) {
-            // Each ListTile is approximately 72 pixels high
-            final position = index * 72.0;
-            _scrollController.animateTo(
-              position,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            _hasScrolledToSelected = true;
-          }
-        });
+        // Each ListTile is approximately 72 pixels high
+        final position = index * 72.0;
+        _scrollController.animateTo(
+          position,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
     }
   }
@@ -66,8 +69,6 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
           if (isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
-
-          _scrollToSelectedNetwork(networks, currentNetwork);
 
           return Column(
             mainAxisSize: MainAxisSize.min,
