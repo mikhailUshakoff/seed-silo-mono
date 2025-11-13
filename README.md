@@ -13,6 +13,7 @@ Seed Silo is a hardware wallet designed to provide secure storage and management
 - Linea
 - Optimism
 - Scroll
+- Taiko
 - zkSync
 
 ## Project Structure
