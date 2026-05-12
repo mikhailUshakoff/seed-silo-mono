@@ -35,15 +35,18 @@ void loop() {
                         message,
                         &msg_len
                     );
+                    secure_memzero(message, msg_len);
+                    msg_len = 0;
                     if (result != CORE_SUCCESS) {
+                        secure_memzero(signature, 64);
+                        rec_id = 0;    
                         error_response(result);
                         return;
                     }
                     sign_cmd_response(signature, rec_id);
                     secure_memzero(signature, 64);
-                    secure_memzero(message, msg_len);
                     rec_id = 0;
-
+                    
                     break;
                 }
                 default:
