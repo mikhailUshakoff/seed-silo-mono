@@ -41,6 +41,7 @@ void loop() {
                     }
                     sign_cmd_response(signature, rec_id);
                     secure_memzero(signature, 64);
+                    secure_memzero(message, msg_len);
                     rec_id = 0;
 
                     break;
