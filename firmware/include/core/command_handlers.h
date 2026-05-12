@@ -2,19 +2,12 @@
 #include "src/decrypt_private_key.h"
 #include "src/get_public_key.h"
 #include "src/sign_message.h"
+#include "src/secure_memzero.h"
 
 constexpr size_t MAX_MSG_LEN = 1024;
 
 void error_response(uint8_t code) {
     Serial.write(&code, 1);
-}
-
-void secure_memzero(volatile void* ptr, size_t len) {
-    if (!ptr) return;
-    volatile uint8_t* p = (volatile uint8_t*)ptr;
-    while (len--) {
-        *p++ = 0;
-    }
 }
 
 void handle_get_version_cmd() {

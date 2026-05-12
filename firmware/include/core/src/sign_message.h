@@ -2,6 +2,7 @@
 #include "secp256k1_c.h"
 #include "module/recovery/main_impl.h"
 #include "../constants.h"
+#include "secure_memzero.h"
 
 extern "C" {
     #include "sha3.h"
@@ -32,10 +33,12 @@ int sign(uint8_t* private_key, uint8_t* message_hash, uint8_t* output, int* rec_
     }
 
     if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(ctx, output, rec_id, &signature)){
+        secure_memzero(&signature, sizeof(signature));
         secp256k1_context_destroy(ctx);
         return CORE_ERR_SERIALIZE_FAILED;
     }
 
+    secure_memzero(&signature, sizeof(signature));
     secp256k1_context_destroy(ctx);
     return CORE_SUCCESS;
 }

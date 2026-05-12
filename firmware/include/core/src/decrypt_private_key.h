@@ -1,6 +1,7 @@
 #include <mbedtls/aes.h>
 #include "../input.h"
 #include "../constants.h"
+#include "secure_memzero.h"
 
 int decrypt_private_key(uint8_t *key, byte pos, uint8_t *output) {
     // Validate input parameters
@@ -37,11 +38,15 @@ int decrypt_private_key(uint8_t *key, byte pos, uint8_t *output) {
     mbedtls_aes_free(&aes);
 
     if (ret != 0) {
+        secure_memzero(decrypted_data, sizeof(decrypted_data));
         return CORE_ERR_DECRYPTION;
     }
 
     // Copy the relevant 32-byte segment to output
     memcpy(output, decrypted_data + pos, 32);
+
+    // Zero decrypted data after use
+    secure_memzero(decrypted_data, sizeof(decrypted_data));
 
     return CORE_SUCCESS;
 }

@@ -10,6 +10,18 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 bool bSignConfirmationScreen = false;
 uint8_t signature[64] = {0};
 int rec_id = 0;
+uint8_t message[MAX_MSG_LEN];
+uint16_t msg_len = 0;
+
+void clear_message() {
+    secure_memzero(message, msg_len);
+    msg_len = 0;
+}
+
+void clear_signature() {
+    secure_memzero(signature, sizeof(signature));
+    rec_id = 0;
+}
 
 void tft_drawString(const char* str, int x, int y) {
     // For demo, just print with coordinates
@@ -248,16 +260,14 @@ void loop() { //...............................................................l
         tft.fillScreen(TFT_BLACK);
         tft.drawString("TX Approved",10,10);
         sign_cmd_response(signature, rec_id);
-        secure_memzero(signature, 64);
-        rec_id = 0;
+        clear_signature();
     }
 
     if(digitalRead(down)==0 && bSignConfirmationScreen){
         bSignConfirmationScreen = false;
         // clear screen
         tft.fillScreen(TFT_BLACK);
-        secure_memzero(signature, 64);
-        rec_id = 0;
+        clear_signature();
         tft.drawString("TX Rejected",10,10);
         uint8_t response = CORE_ERR_TX_REJECTED;
         Serial.write(&response, 1);
@@ -287,8 +297,6 @@ void loop() { //...............................................................l
                 case CMD_SIGN:
                 {
                     tft.drawString("CMD: sign",5,5);
-                    uint8_t message[MAX_MSG_LEN];
-                    uint16_t msg_len = 0;
 
                     int result = sign_cmd_get_msg_signature(
                         signature,
@@ -297,12 +305,16 @@ void loop() { //...............................................................l
                         &msg_len
                     );
                     if (result != CORE_SUCCESS) {
+                        clear_message();
+                        clear_signature();
                         error_response(result);
                         return;
                     }
 
                     result = parse_eip1559_tx(message, msg_len);
-                    if (result != CORE_SUCCESS) {
+                    clear_message();
+                    if (result != CORE_SUCCESS) {               
+                        clear_signature();
                         error_response(result);
                         return;
                     }
