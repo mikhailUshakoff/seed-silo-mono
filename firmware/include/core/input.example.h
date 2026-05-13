@@ -3,7 +3,7 @@
 
 #define DECRYPTED_DATA_LEN 256
 #define ENCRYPTED_DATA_LEN 256
-#define GCM_IV_LEN 12  
+#define GCM_IV_LEN 12
 #define GCM_TAG_LEN 16
 
 #define GCM_IV_INITIALIZER {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b}
