@@ -1,4 +1,4 @@
-#include <mbedtls/aes.h>
+#include <mbedtls/gcm.h>
 #include "../input.h"
 #include "../constants.h"
 #include "secure_memzero.h"
@@ -14,28 +14,30 @@ int decrypt_private_key(uint8_t *key, byte pos, uint8_t *output) {
     }
 
     // Initialize AES context
-    mbedtls_aes_context aes;
-    mbedtls_aes_init(&aes);
+    mbedtls_gcm_context aes;
+    mbedtls_gcm_init(&aes);
 
     // Set AES key (256-bit)
-    int ret = mbedtls_aes_setkey_enc(&aes, key, 256);
+    int ret = mbedtls_gcm_setkey(&aes, MBEDTLS_CIPHER_ID_AES, key, 256);
     if (ret != 0) {
-        mbedtls_aes_free(&aes);
+        mbedtls_gcm_free(&aes);
         return CORE_ERR_KEY_SETUP;
     }
 
     // Set AES IV
-    unsigned char iv[16] = AES_IV_INITIALIZER;
+    unsigned char iv[GCM_IV_LEN] = GCM_IV_INITIALIZER;
+    // Set AES GCM tag
+    unsigned char tag[GCM_TAG_LEN] = GCM_TAG_INITIALIZER;
 
     // Set encrypted data
     unsigned char encrypted_data[ENCRYPTED_DATA_LEN] = ENCRYPTED_DATA_INITIALIZER;
     // Buffer for decrypted data
     unsigned char decrypted_data[DECRYPTED_DATA_LEN] = {0};
     // Print decrypted data
-    ret = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, ENCRYPTED_DATA_LEN, iv, encrypted_data, decrypted_data);
+    ret = mbedtls_gcm_auth_decrypt(&aes, ENCRYPTED_DATA_LEN, iv, sizeof(iv), NULL, 0, tag, sizeof(tag), encrypted_data, decrypted_data);
 
     // Clean up
-    mbedtls_aes_free(&aes);
+    mbedtls_gcm_free(&aes);
 
     if (ret != 0) {
         secure_memzero(decrypted_data, sizeof(decrypted_data));
