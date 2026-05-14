@@ -47,11 +47,13 @@ int rlp_read_length(const uint8_t *data, size_t data_len, size_t *out_len, size_
     } else if (prefix <= 0xbf) {
         size_t len_of_len = prefix - 0xb7;
         if (len_of_len + 1 > data_len) return -1;
+        // RLP limits length prefix to 4 bytes (32 bits) for strings
+        if (len_of_len > 4) return -1;
         size_t len = 0;
         for (size_t i = 0; i < len_of_len; i++) {
             len = (len << 8) | data[1 + i];
         }
-        if (len + len_of_len + 1 > data_len) return -1;
+        if (len_of_len + len > data_len) return -1;
         *out_len = len;
         *out_offset = 1 + len_of_len;
         return 0;
@@ -64,11 +66,13 @@ int rlp_read_length(const uint8_t *data, size_t data_len, size_t *out_len, size_
     } else if (prefix <= 0xff) {
         size_t len_of_len = prefix - 0xf7;
         if (len_of_len + 1 > data_len) return -1;
+        // RLP limits length prefix to 3 bytes (24 bits) for lists
+        if (len_of_len > 3) return -1;
         size_t len = 0;
         for (size_t i = 0; i < len_of_len; i++) {
             len = (len << 8) | data[1 + i];
         }
-        if (len + len_of_len + 1 > data_len) return -1;
+        if (len_of_len + len > data_len) return -1;
         *out_len = len;
         *out_offset = 1 + len_of_len;
         return 0;
@@ -235,7 +239,6 @@ void drawSignConfirmationUI() {
     tft.drawWideLine(294, 144, 306, 156, 3, TFT_BLACK);
     tft.drawWideLine(294, 156, 306, 144, 3, TFT_BLACK);
 }
-
 
 void setup() {  //.......................setup
 
