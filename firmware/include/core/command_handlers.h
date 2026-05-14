@@ -1,10 +1,11 @@
+#ifndef COMMAND_HANDLERS_H
+#define COMMAND_HANDLERS_H
+
 #include "constants.h"
 #include "src/decrypt_private_key.h"
 #include "src/get_public_key.h"
 #include "src/sign_message.h"
 #include "src/secure_memzero.h"
-
-constexpr size_t MAX_MSG_LEN = 1024;
 
 void error_response(uint8_t code) {
     Serial.write(&code, 1);
@@ -153,3 +154,4 @@ void handle_sign_cmd() {
 }
 
 
+#endif // COMMAND_HANDLERS_H

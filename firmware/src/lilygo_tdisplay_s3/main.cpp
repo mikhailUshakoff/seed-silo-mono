@@ -1,5 +1,9 @@
 #include <TFT_eSPI.h>
 #include <core/command_handlers.h>
+#include "rlp_parser.h"
+#include "display_utils.h"
+#include "tx_parser.h"
+#include "message_utils.h"
 
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite sprite = TFT_eSprite(&tft);
@@ -8,335 +12,42 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 #define up 14
 
 bool bSignConfirmationScreen = false;
-uint8_t signature[64] = {0};
-int rec_id = 0;
-uint8_t message[MAX_MSG_LEN];
-uint16_t msg_len = 0;
 
-void clear_message() {
-    secure_memzero(message, msg_len);
-    msg_len = 0;
-}
-
-void clear_signature() {
-    secure_memzero(signature, sizeof(signature));
-    rec_id = 0;
-}
-
-void tft_drawString(const char* str, int x, int y) {
-    // For demo, just print with coordinates
-    printf("TFT @(%d,%d): %s\n", x, y, str);
-}
-
-// RLP length decode: handles strings and lists (short and long)
-int rlp_read_length(const uint8_t *data, size_t data_len, size_t *out_len, size_t *out_offset) {
-    if (data_len == 0) return -1;
-
-    uint8_t prefix = data[0];
-
-    if (prefix <= 0x7f) {
-        *out_len = 1;
-        *out_offset = 0;
-        return 0;
-    } else if (prefix <= 0xb7) {
-        size_t len = prefix - 0x80;
-        if (len > data_len - 1) return -1;
-        *out_len = len;
-        *out_offset = 1;
-        return 0;
-    } else if (prefix <= 0xbf) {
-        size_t len_of_len = prefix - 0xb7;
-        if (len_of_len + 1 > data_len) return -1;
-        // RLP limits length prefix to 4 bytes (32 bits) for strings
-        if (len_of_len > 4) return -1;
-        size_t len = 0;
-        for (size_t i = 0; i < len_of_len; i++) {
-            len = (len << 8) | data[1 + i];
-        }
-        if (len_of_len + len > data_len) return -1;
-        *out_len = len;
-        *out_offset = 1 + len_of_len;
-        return 0;
-    } else if (prefix <= 0xf7) {
-        size_t len = prefix - 0xc0;
-        if (len > data_len - 1) return -1;
-        *out_len = len;
-        *out_offset = 1;
-        return 0;
-    } else if (prefix <= 0xff) {
-        size_t len_of_len = prefix - 0xf7;
-        if (len_of_len + 1 > data_len) return -1;
-        // RLP limits length prefix to 3 bytes (24 bits) for lists
-        if (len_of_len > 3) return -1;
-        size_t len = 0;
-        for (size_t i = 0; i < len_of_len; i++) {
-            len = (len << 8) | data[1 + i];
-        }
-        if (len_of_len + len > data_len) return -1;
-        *out_len = len;
-        *out_offset = 1 + len_of_len;
-        return 0;
-    }
-
-    return -1;
-}
-
-// Reads a single RLP item (string or list element) from data buffer
-const uint8_t* rlp_read_item(const uint8_t *data, size_t data_len, size_t *item_len, size_t *consumed) {
-    size_t len = 0, offset = 0;
-    if (rlp_read_length(data, data_len, &len, &offset) != 0) return NULL;
-    if (offset + len > data_len) return NULL;
-    *item_len = len;
-    *consumed = offset + len;
-    return data + offset;
-}
-
-// Utility: Print hex to TFT (or console here) with label at (x,y)
-static int format_hex_string(char *buf, size_t buf_size,
-    const char *label,
-    const uint8_t *data, size_t len,
-    bool trim_leading_zeros
-) {
-    int written = snprintf(buf, buf_size, "%s: 0x", label);
-    if (written < 0 || (size_t)written >= buf_size) return written;
-
-    size_t start = 0;
-    if (trim_leading_zeros) {
-        while (start < len && data[start] == 0) {
-            start++;
-        }
-    }
-
-    if (start == len) {
-        // All zeros
-        written += snprintf(buf + written, buf_size - written, "0");
-        return written;
-    }
-
-    for (size_t i = start; i < len && (size_t)written < buf_size - 3; i++) {
-        written += snprintf(buf + written, buf_size - written, "%02x", data[i]);
-    }
-
-    return written;
-}
-
-void print_hex_tft(const char *label, const uint8_t *data, size_t len, int x, int y) {
-    char buf[256];
-    format_hex_string(buf, sizeof(buf), label, data, len, false);
-    tft.drawString(buf, x, y);
-}
-
-void print_chain_id_tft(const char *label, const uint8_t *data, size_t len, int x, int y) {
-    char buf[256];
-    int written = format_hex_string(buf, sizeof(buf), label, data, len, false);
-
-    if (len >= 2 && memcmp(data, "\x42\x68", 2) == 0) {
-        snprintf(buf + written, sizeof(buf) - written, " (Holesky)");
-    }
-
-    tft.drawString(buf, x, y);
-}
-
-void print_hex_tft_trim_leading_zeros(const char *label, const uint8_t *data, size_t len, int x, int y) {
-    char buf[256];
-    format_hex_string(buf, sizeof(buf), label, data, len, true);
-    tft.drawString(buf, x, y);
-}
-
-// Check if transaction is EIP-1559 type-2
-static int is_eip1559_tx(const uint8_t *tx, uint16_t len) {
-    if (len < 2 || tx[0] != 0x02) {
-        tft.drawString("Not a type-2 tx", 10, 15);
-        print_hex_tft("tx", tx, len, 10, 30);
-        return CORE_ERR_NOT_TYPE2_TX;
-    }
-    return CORE_SUCCESS;
-}
-
-// Parse RLP list header
-static int parse_rlp_list_header(const uint8_t *rlp, size_t rlp_len,
-                                  size_t *list_len, size_t *list_offset) {
-    if (rlp_read_length(rlp, rlp_len, list_len, list_offset) != 0) {
-        tft.drawString("RLP list parse fail", 10, 15);
-        return CORE_ERR_RLP_LIST_PARSE;
-    }
-
-    if (*list_offset + *list_len > rlp_len) {
-        tft.drawString("RLP list length invalid", 10, 15);
-        return CORE_ERR_RLP_LIST_LENGTH;
-    }
-
-    return CORE_SUCCESS;
-}
-
-// Parse and display EIP-20 transfer data
-static int parse_eip20_transfer(const uint8_t *field, size_t field_len,
-                                 int x, int *y, int line_height) {
-    if (field_len != 4 + 32 + 32 || memcmp(field, "\xa9\x05\x9c\xbb", 4) != 0) {
-        tft.drawString("Not EIP-20 transfer", x, *y);
-        return CORE_ERR_NOT_EIP20_TRANSFER;
-    }
-
-    const uint8_t *to_address = field + 4 + 12;  // skip function selector + padding
-    const uint8_t *amount = field + 4 + 32;
-
-    tft.drawString("EIP-20 transfer (0xa9059cbb)", x, *y);
-    *y += line_height;
-    print_hex_tft("to", to_address, 20, x + 5, *y);
-    *y += line_height;
-    print_hex_tft_trim_leading_zeros("amount", amount, 32, x + 5, *y);
-
-    return CORE_SUCCESS;
-}
-
-// Display a separator line
-static void draw_separator(int x, int y) {
-    tft.setTextColor(TFT_SILVER, TFT_BLACK);
-    tft.drawString("------------------------------------------------", x - 5, y);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-}
-
-// Display a single transaction field
-static int display_tx_field(int field_index, const char *field_name,
-                             const uint8_t *field, size_t field_len,
-                             int x, int *y, int line_height) {
-    // Chain ID (field 0)
-    if (field_index == 0) {
-        print_chain_id_tft(field_name, field, field_len, x, *y);
-    }
-    // Data field (field 7) - check for EIP-20 transfer
-    else if (field_index == 7 && field_len > 0) {
-        int result = parse_eip20_transfer(field, field_len, x, y, line_height);
-        if (result != CORE_SUCCESS) {
-            return result;
-        }
-    }
-    // All other fields
-    else {
-        print_hex_tft(field_name, field, field_len, x, *y);
-    }
-
-    *y += line_height;
-
-    // Draw separator after gas_limit (field 4) and data (field 7)
-    if (field_index == 4 || field_index == 7) {
-        draw_separator(x, *y);
-        *y += line_height;
-    }
-
-    return CORE_SUCCESS;
-}
-
-// Parse and display all transaction fields
-static int parse_tx_fields(const uint8_t *p, size_t remaining) {
-    const char *fields[] = {
-        "chain_id", "nonce", "max_priority_fee_per_gas", "max_fee_per_gas",
-        "gas_limit", "to", "value", "data"
-    };
-    const int num_fields = sizeof(fields) / sizeof(fields[0]);
-    const int x = 10;
-    int y = 15;
-    const int line_height = 10;
-
-    for (int i = 0; i < num_fields && remaining > 0; i++) {
-        size_t field_len = 0, consumed = 0;
-        const uint8_t *field = rlp_read_item(p, remaining, &field_len, &consumed);
-        if (!field) {
-            tft.drawString("RLP field parse fail", x, y);
-            return CORE_ERR_RLP_FIELD_PARSE;
-        }
-
-        int result = display_tx_field(i, fields[i], field, field_len, x, &y, line_height);
-        if (result != CORE_SUCCESS) {
-            return result;
-        }
-
-        p += consumed;
-        remaining -= consumed;
-    }
-
-    // Display remaining bytes if any
-    if (remaining > 0) {
-        print_hex_tft("remaining", p, remaining, x, y);
-    }
-
-    return CORE_SUCCESS;
-}
-
-// Main parser: parse EIP-1559 type-2 tx and display all fields
-int parse_eip1559_tx(const uint8_t *tx, uint16_t len) {
-    // Validate transaction type
-    int result = is_eip1559_tx(tx, len);
-    if (result != CORE_SUCCESS) {
-        return result;
-    }
-
-    // Extract RLP payload
-    const uint8_t *rlp = tx + 1;
-    size_t rlp_len = len - 1;
-
-    // Parse RLP list header
-    size_t list_len = 0, list_offset = 0;
-    result = parse_rlp_list_header(rlp, rlp_len, &list_len, &list_offset);
-    if (result != CORE_SUCCESS) {
-        return result;
-    }
-
-    // Parse and display transaction fields
-    const uint8_t *p = rlp + list_offset;
-    size_t remaining = list_len;
-    return parse_tx_fields(p, remaining);
-}
-
-void drawSignConfirmationUI() {
-    // display: 320, 170
-    // draw approve icon
-    tft.fillRect(290, 10, 20, 20, TFT_GREEN);
-    tft.drawWideLine(298, 26, 306, 14, 3, TFT_BLACK);
-    tft.drawWideLine(298, 26, 294, 18, 3, TFT_BLACK);
-    // draw reject icon
-    tft.fillRect(290, 140, 20, 20, TFT_RED);
-    tft.drawWideLine(294, 144, 306, 156, 3, TFT_BLACK);
-    tft.drawWideLine(294, 156, 306, 144, 3, TFT_BLACK);
-}
-
-void setup() {  //.......................setup
-
+void setup() {
     Serial.begin(115200);
 
-    pinMode(down,INPUT_PULLUP);
-    pinMode(up,INPUT_PULLUP);
+    pinMode(down, INPUT_PULLUP);
+    pinMode(up, INPUT_PULLUP);
     tft.init();
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
 
-    tft.setTextColor(TFT_WHITE,TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
 
-    tft.drawString("Hello World!",10,10);
+    tft.drawString("Hello World!", 10, 10);
 }
 
-void loop() { //...............................................................loop
-
-    if(digitalRead(up)==0 && bSignConfirmationScreen){
+void loop() {
+    if (digitalRead(up) == 0 && bSignConfirmationScreen) {
         bSignConfirmationScreen = false;
         // clear screen
         tft.fillScreen(TFT_BLACK);
-        tft.drawString("TX Approved",10,10);
+        tft.drawString("TX Approved", 10, 10);
         sign_cmd_response(signature, rec_id);
         clear_signature();
     }
 
-    if(digitalRead(down)==0 && bSignConfirmationScreen){
+    if (digitalRead(down) == 0 && bSignConfirmationScreen) {
         bSignConfirmationScreen = false;
         // clear screen
         tft.fillScreen(TFT_BLACK);
         clear_signature();
-        tft.drawString("TX Rejected",10,10);
+        tft.drawString("TX Rejected", 10, 10);
         uint8_t response = CORE_ERR_TX_REJECTED;
         Serial.write(&response, 1);
     }
 
-    if (Serial.available()) {  // Check if data is available
+    if (Serial.available()) {
         // clear screen
         tft.fillScreen(TFT_BLACK);
 
@@ -347,19 +58,19 @@ void loop() { //...............................................................l
             switch (cmd_input) {
                 case CMD_GET_VERSION:
                 {
-                    tft.drawString("CMD: check status1",10,10);
+                    tft.drawString("CMD: check status1", 10, 10);
                     handle_get_version_cmd();
                     break;
                 }
                 case CMD_GET_PUBKEY:
                 {
-                    tft.drawString("CMD: get public key",10,10);
+                    tft.drawString("CMD: get public key", 10, 10);
                     handle_get_pubkey_cmd();
                     break;
                 }
                 case CMD_SIGN:
                 {
-                    tft.drawString("CMD: sign",5,5);
+                    tft.drawString("CMD: sign", 5, 5);
 
                     int result = sign_cmd_get_msg_signature(
                         signature,
@@ -376,7 +87,7 @@ void loop() { //...............................................................l
 
                     result = parse_eip1559_tx(message, msg_len);
                     clear_message();
-                    if (result != CORE_SUCCESS) {               
+                    if (result != CORE_SUCCESS) {
                         clear_signature();
                         error_response(result);
                         return;
@@ -390,16 +101,15 @@ void loop() { //...............................................................l
                 }
                 default:
                 {
-                    tft.drawString("CMD: unknown",10,30);
+                    tft.drawString("CMD: unknown", 10, 30);
                     uint8_t response_err = CORE_ERR_UNKNOWN_CMD;
                     Serial.write(&response_err, 1);
                 }
             }
         } else {
-            tft.drawString("SERIAL: no data",10,30);
+            tft.drawString("SERIAL: no data", 10, 30);
         }
     }
 
     delay(1000);
 }
-
