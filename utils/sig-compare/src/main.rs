@@ -8,7 +8,7 @@ use sha3::{Digest, Keccak256};
 async fn main() -> anyhow::Result<()> {
     // --- Private Key ---
     let private_key = std::env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
-    let plaintext = hex::decode(private_key).unwrap();
+    let plaintext = hex::decode(private_key.trim_start_matches("0x")).unwrap();
 
     // --- Hash list ---
     let tx_hashes = std::env::var("TX_HASHES").expect("TX_HASHES must be set");
