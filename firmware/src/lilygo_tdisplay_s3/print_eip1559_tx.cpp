@@ -61,13 +61,13 @@ void print_hex_tft_trim_leading_zeros(const char *label, const uint8_t *data, si
     tft.drawString(buf, x, y);
 }
 
-bool is_eip1559_tx(const uint8_t *tx, uint16_t len) {
-    return len >= 28 && tx[0] == 0x02;
+inline bool not_eip1559_tx(const uint8_t *tx, uint16_t len) {
+    return len < 28 || tx[0] != 0x02;
 }
 
 // Main parser: parse EIP-1559 type-2 tx and print all fields
 int print_eip1559_tx(const uint8_t *tx, uint16_t len) {
-    if (!is_eip1559_tx(tx, len)) {
+    if (not_eip1559_tx(tx, len)) {
         tft.drawString("Not a type-2 tx", 10, 15);
         print_hex_tft("tx", tx, len, 10, 30);
         return CORE_ERR_NOT_TYPE2_TX;
