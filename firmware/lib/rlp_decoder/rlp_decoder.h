@@ -2,6 +2,7 @@
 #define RLP_DECODER_H
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {
