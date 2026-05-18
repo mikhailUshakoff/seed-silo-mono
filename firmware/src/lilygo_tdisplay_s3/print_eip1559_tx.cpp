@@ -153,7 +153,9 @@ int print_eip1559_tx(const uint8_t *tx, uint16_t len) {
     }
 
     // Any bytes left in the iterator print as remainder
-    print_hex_tft("remaining", it.cursor, it.remaining, x, y);
+    if (it.remaining > 0) {
+        print_hex_tft("remaining", it.cursor, it.remaining, x, y);
+    }
 
     return CORE_SUCCESS;
 }
