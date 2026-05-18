@@ -82,7 +82,7 @@ int print_eip1559_tx(const uint8_t *tx, uint16_t len) {
 
     const char *fields[] = {
         "chain_id", "nonce", "max_priority_fee_per_gas", "max_fee_per_gas",
-        "gas_limit", "to", "value", "data"
+        "gas_limit", "to", "value", "data", "access_list"
     };
     const int num_fields = sizeof(fields) / sizeof(fields[0]);
 
@@ -130,6 +130,14 @@ int print_eip1559_tx(const uint8_t *tx, uint16_t len) {
             y += line_height;
             print_hex_tft_trim_leading_zeros("amount", amount, 32, x, y);
             x -= 5;
+        } else if (i == 8) {
+            // access_list is an RLP list — just show its length
+            if (field.type == RLP_LIST && field.payload_len == 0) {
+                tft.drawString("access_list: []", x, y);
+            } else {
+                // non-empty access list — show raw bytes
+                print_hex_tft("access_list", field.payload, field.payload_len, x, y);
+            }
         } else {
             print_hex_tft(fields[i], payload, payload_len, x, y);
         }
@@ -145,9 +153,7 @@ int print_eip1559_tx(const uint8_t *tx, uint16_t len) {
     }
 
     // Any bytes left in the iterator print as remainder
-    if (it.remaining > 0) {
-        print_hex_tft("remaining", it.cursor, it.remaining, x, y);
-    }
+    print_hex_tft("remaining", it.cursor, it.remaining, x, y);
 
     return CORE_SUCCESS;
 }
