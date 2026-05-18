@@ -29,7 +29,10 @@ static int format_hex_string(char *buf, size_t buf_size,
     }
 
     for (size_t i = start; i < len && (size_t)written < buf_size - 3; i++) {
-        written += snprintf(buf + written, buf_size - written, "%02x", data[i]);
+        int res = snprintf(buf + written, buf_size - written, "%02x", data[i]);
+        if (res < 0) return written;
+        written += res;
+        if ((size_t)written >= buf_size) return written;
     }
 
     return written;
