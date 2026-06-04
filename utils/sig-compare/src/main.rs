@@ -53,9 +53,9 @@ async fn parse_tx_hashes(address: Address) -> anyhow::Result<Vec<TxHash>> {
 
             let hashes: Vec<H256> = document
                 .select(&selector)
-                .map(|el| el.value().attr("href").unwrap_or("").replace("/tx/", ""))
+                .filter_map(|el| el.value().attr("href").and_then(|h| h.strip_prefix("/tx/")))
                 .filter(|h| h.starts_with("0x"))
-                .filter_map(|h| H256::from_str(&h).ok())
+                .filter_map(|h| H256::from_str(h).ok())
                 .take(tx_count)
                 .collect();
             Ok(hashes)
