@@ -21,13 +21,13 @@ Set the following environment variables:
 ### Required Variables
 
 - `PRIVATE_KEY`: The private key (hex string with or without 0x prefix) of the account that signed the transactions
+- `API_KEY`: Etherscan API key (required if `TX_HASHES` is not provided)
+- `TX_HASHES`: Comma-separated list of transaction hashes to verify. If not provided, the tool will fetch recent transactions from Etherscan using the `API_KEY`
 
 ### Optional Variables
 
-- `TX_HASHES`: Comma-separated list of transaction hashes to verify. If not provided, the tool will fetch recent transactions from the blockchain explorer
 - `RPC_URL`: RPC endpoint URL (default: "https://ethereum-hoodi-rpc.publicnode.com")
-- `ETHERSCAN_URL`: Block explorer URL for fetching transactions when TX_HASHES is not provided (default: "https://hoodi.etherscan.io")
-- `TX_COUNT`: Number of transactions to fetch from the explorer when TX_HASHES is not provided (default: 10)
+- `TX_COUNT`: Number of transactions to fetch from Etherscan when `TX_HASHES` is not provided (default: 10)
 
 ## Usage
 
@@ -35,7 +35,15 @@ Set the following environment variables:
 
 ```bash
 export PRIVATE_KEY="your_private_key_hex"
-export TX_HASHES="0xabc123...,0xdef456...,0x789ghi..."
+export API_KEY="your_etherscan_api_key"
+cargo run
+```
+
+### With Specific Transaction Hashes
+
+```bash
+export PRIVATE_KEY="your_private_key_hex"
+export TX_HASHES="0xabc123...,0xdef456..."
 cargo run
 ```
 
@@ -43,7 +51,7 @@ cargo run
 
 ```bash
 export PRIVATE_KEY="your_private_key_hex"
-export TX_HASHES="0xabc123...,0xdef456...,0x789ghi..."
+export API_KEY="your_etherscan_api_key"
 export RPC_URL="https://your-rpc-endpoint.com"
 cargo run
 ```
