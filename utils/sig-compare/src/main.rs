@@ -18,7 +18,7 @@ async fn parse_tx_hashes(address: Address) -> anyhow::Result<Vec<TxHash>> {
             Ok(hash_list)
         }
         Err(_) => {
-            println!("Get transaction hashes from the chain");
+            println!("Fetching transaction hashes from the block explorer");
             let etherscan_url = std::env::var("ETHERSCAN_URL")
                 .unwrap_or_else(|_| "https://hoodi.etherscan.io".to_string());
             let url = format!("{}/txs?a={:?}&f=2", etherscan_url, address);
