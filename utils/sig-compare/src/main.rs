@@ -40,7 +40,7 @@ async fn parse_tx_hashes(address: Address) -> anyhow::Result<Vec<TxHash>> {
                     "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 )
                 .header("Accept-Language", "en-US,en;q=0.5")
-                .header("Referer", "https://etherscan.io/")
+                .header("Referer", etherscan_url.as_str())
                 .send()
                 .await?
                 .text()
