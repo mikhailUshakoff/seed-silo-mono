@@ -1,8 +1,83 @@
 use ethers::core::k256::ecdsa::SigningKey;
 use ethers::prelude::*;
-use ethers::types::{transaction::eip2718::TypedTransaction, Transaction, TxHash, Signature};
-use std::str::FromStr;
+use ethers::types::{Signature, Transaction, TxHash, transaction::eip2718::TypedTransaction};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
+use std::str::FromStr;
+
+#[derive(Debug, Deserialize)]
+struct Tx {
+    hash: H256,
+}
+
+#[derive(Debug, Deserialize)]
+struct Response {
+    // status: String,
+    // message: String,
+    result: Vec<Tx>,
+}
+
+#[derive(Serialize)]
+struct EtherscanQuery {
+    chainid: u64,
+    apikey: String,
+    address: String,
+    sort: &'static str,
+    module: &'static str,
+    action: &'static str,
+    page: u32,
+    offset: usize,
+}
+
+async fn parse_tx_hashes(chain_id: u64, address: Address) -> anyhow::Result<Vec<TxHash>> {
+    if let Ok(hashes) = std::env::var("TX_HASHES") {
+        return Ok(hashes
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(H256::from_str)
+            .collect::<std::result::Result<_, _>>()?);
+    }
+
+    let api_key = std::env::var("API_KEY").expect("API_KEY must be set (or provide TX_HASHES)");
+
+    let tx_count = std::env::var("TX_COUNT")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(10);
+
+    let client = Client::new();
+
+    let query = EtherscanQuery {
+        chainid: chain_id,
+        apikey: api_key,
+        address: format!("{address:#x}"),
+        sort: "desc",
+        module: "account",
+        action: "txlist",
+        page: 1,
+        offset: tx_count,
+    };
+
+    let response: Response = client
+        .get("https://api.etherscan.io/v2/api")
+        .query(&query)
+        .send()
+        .await
+        .expect("failed to send request to etherscan")
+        .error_for_status()
+        .expect("etherscan returned error status")
+        .json()
+        .await
+        .expect("failed to decode etherscan response");
+
+    if response.result.is_empty() {
+        return Ok(vec![]);
+    }
+
+    Ok(response.result.into_iter().map(|tx| tx.hash).collect())
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -10,28 +85,24 @@ async fn main() -> anyhow::Result<()> {
     let private_key = std::env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
     let plaintext = hex::decode(private_key.trim_start_matches("0x")).unwrap();
 
-    // --- Hash list ---
-    let tx_hashes = std::env::var("TX_HASHES").expect("TX_HASHES must be set");
-    let hash_list: Vec<&str> = tx_hashes.split(',').map(|s| s.trim()).collect();
-
     // --- RPC URL ---
-    let rpc_url = std::env::var("RPC_URL").unwrap_or_else(|_| "https://sepolia.optimism.io".to_string());
+    let rpc_url = std::env::var("RPC_URL")
+        .unwrap_or_else(|_| "https://ethereum-hoodi-rpc.publicnode.com".to_string());
     let provider = Provider::<Http>::try_from(rpc_url.as_str())?;
-    //let provider = Provider::<Http>::try_from("https://ethereum-holesky-rpc.publicnode.com")?;
-    //let provider = Provider::<Http>::try_from("https://sepolia.optimism.io")?;
     let signing_key = SigningKey::from_slice(&plaintext).unwrap();
+    let wallet = LocalWallet::from(signing_key.clone());
+    let chain_id = provider.get_chainid().await?.as_u64();
 
-    for (index, hash_str) in hash_list.iter().enumerate() {
-        println!("\n--- Processing hash {} of {} ---", index + 1, hash_list.len());
-        println!("TX_HASH: {}", hash_str);
+    // --- Hash list ---
+    let hash_list = parse_tx_hashes(chain_id, wallet.address()).await?;
+    println!("Using RPC URL: {}", rpc_url);
+    println!("Chain ID: {}", chain_id);
+    println!("Wallet Address: {:?}", wallet.address());
 
-        let tx_hash = match TxHash::from_str(hash_str) {
-            Ok(hash) => hash,
-            Err(e) => {
-                println!("❌ Invalid hash format: {}", e);
-                continue;
-            }
-        };
+    let hash_len = hash_list.len();
+    for (index, tx_hash) in hash_list.into_iter().enumerate() {
+        println!("\n--- Processing hash {} of {} ---", index + 1, hash_len);
+        println!("TX_HASH: {}", tx_hash);
 
         // --- Fetch Transaction ---
         let tx: Transaction = match provider.get_transaction(tx_hash).await {
@@ -70,11 +141,18 @@ async fn main() -> anyhow::Result<()> {
         let message_hash = Keccak256::digest(rlp_unsigned);
 
         let local_signature = signing_key.sign_prehash_recoverable(&message_hash).unwrap();
-        println!("Local Signature: {}, v: {:?}", &local_signature.0, &local_signature.1);
+        println!(
+            "Local Signature: {}, v: {:?}",
+            &local_signature.0, &local_signature.1
+        );
 
         // --- Compare signatures ---
-        let (r, s, v) = (tx.r, tx.s, tx.v) ;
-        let network_sig = Signature { r, s, v: v.as_u64() };
+        let (r, s, v) = (tx.r, tx.s, tx.v);
+        let network_sig = Signature {
+            r,
+            s,
+            v: v.as_u64(),
+        };
         println!("Network Signature: {}", network_sig);
 
         if network_sig.r == U256::from_big_endian(&local_signature.0.r().to_bytes())
