@@ -25,6 +25,12 @@ void clear_signature() {
     rec_id = 0;
 }
 
+void clear_state() {
+    clear_signature();
+    clear_message();
+    bSignConfirmationScreen = false;
+}
+
 void drawSignConfirmationUI() {
     // display: 320, 170
     // draw approve icon
@@ -60,20 +66,21 @@ void loop() { //...............................................................l
         tft.fillScreen(TFT_BLACK);
         tft.drawString("TX Approved",10,10);
         sign_cmd_response(signature, rec_id);
-        clear_signature();
+        clear_state();
     }
 
     if(digitalRead(down)==0 && bSignConfirmationScreen){
         bSignConfirmationScreen = false;
+        clear_state();
         // clear screen
         tft.fillScreen(TFT_BLACK);
-        clear_signature();
         tft.drawString("TX Rejected",10,10);
         uint8_t response = CORE_ERR_TX_REJECTED;
         Serial.write(&response, 1);
     }
 
     if (Serial.available()) {  // Check if data is available
+        clear_state();
         // clear screen
         tft.fillScreen(TFT_BLACK);
 
@@ -105,16 +112,14 @@ void loop() { //...............................................................l
                         &msg_len
                     );
                     if (result != CORE_SUCCESS) {
-                        clear_message();
-                        clear_signature();
+                        clear_state();
                         error_response(result);
                         return;
                     }
 
                     result = print_eip1559_tx(message, msg_len);
-                    clear_message();
                     if (result != CORE_SUCCESS) {               
-                        clear_signature();
+                        clear_state();
                         error_response(result);
                         return;
                     }
