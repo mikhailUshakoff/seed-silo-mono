@@ -2,9 +2,10 @@
 name = "sig-compare"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
 
 [dependencies]
-ethers.workspace = true
+alloy.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
 hex.workspace = true

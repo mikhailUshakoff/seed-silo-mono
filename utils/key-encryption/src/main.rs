@@ -2,7 +2,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use hex;
 use rand::Rng;
 use std::env;
