@@ -1,0 +1,76 @@
+# https://embarkstudios.github.io/cargo-deny/index.html
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+]
+all-features = true
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn" # core2@0.4.0 is yanked with no upgrade path (transitive via kona); revisit when kona updates libp2p
+ignore = [
+    "RUSTSEC-2024-0436", # paste is unmaintained, no safe upgrade; baked into alloy-primitives itself
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "0BSD",
+    "BSL-1.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "CC-BY-1.0",
+    "CC-BY-2.0",
+    "CC-BY-3.0",
+    "CC-BY-4.0",
+    "CC0-1.0",
+    "ISC",
+    "OpenSSL",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+
+# ring 0.16.20 has no `license` field in Cargo.toml, only a LICENSE file
+# that cargo-deny can't confidently parse (score 0.66). Pin the known
+# expression explicitly instead of relying on fuzzy text matching.
+[[licenses.clarify]]
+name = "ring"
+version = "0.16.20"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 },
+]
+
+[licenses.private]
+ignore = false
+registries = []
+
+[bans]
+allow-wildcard-paths = true
+multiple-versions = "allow"
+wildcards = "deny"
+highlight = "all"
+
+[bans.workspace-dependencies]
+duplicates = 'deny'
+unused = 'deny'
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+[sources.allow-org]
+github = []
+gitlab = []
+bitbucket = []

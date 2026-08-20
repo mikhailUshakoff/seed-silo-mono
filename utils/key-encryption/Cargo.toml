@@ -2,11 +2,12 @@
 name = "key-encryption"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 [dependencies]
-dotenv = "0.15.0"
-aes-gcm = "0.10.3"
-tiny-keccak = { version = "2.0.0", features = ["keccak"] }
-rand = "0.8.5"
-hex = "0.4.3"
-secp256k1 = "0.24"
+dotenvy.workspace = true
+aes-gcm.workspace = true
+tiny-keccak.workspace = true
+rand.workspace = true
+hex.workspace = true
+secp256k1.workspace = true
