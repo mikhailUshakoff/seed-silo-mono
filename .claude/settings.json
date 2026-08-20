@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(firmware/include/core/input.h)"
+    ]
+  }
+}
