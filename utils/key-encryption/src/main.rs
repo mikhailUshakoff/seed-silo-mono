@@ -1,9 +1,10 @@
+#![allow(clippy::println_empty_string)]
+
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use dotenvy::dotenv;
-use hex;
 use rand::Rng;
 use std::env;
 use tiny_keccak::{Hasher, Keccak};
