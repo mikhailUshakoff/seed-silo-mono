@@ -78,7 +78,7 @@ fn main() {
 
     // Generate a random nonce (12 bytes for AES-GCM)
     let nonce_bytes: [u8; GCM_NONCE_LEN] = rand::thread_rng().gen();
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::try_from(&nonce_bytes[..]).unwrap();
 
     // ---- Build 128-byte plaintext buffer ----
     let mut plaintext = [0u8; PLAINTEXT_LEN];
@@ -93,7 +93,7 @@ fn main() {
     // Encrypt the data using AES-GCM
     let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
     let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_ref())
+        .encrypt(&nonce, plaintext.as_ref())
         .expect("encryption failure!");
 
     // GCM appends a 16-byte authentication tag to the ciphertext
@@ -154,7 +154,7 @@ mod tests {
         let nonce_bytes: [u8; GCM_NONCE_LEN] = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
         ];
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::try_from(&nonce_bytes[..]).unwrap();
 
         // Create test plaintext
         let plaintext: [u8; PLAINTEXT_LEN] = [0x42; PLAINTEXT_LEN];
@@ -162,7 +162,7 @@ mod tests {
         // Encrypt
         let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
         let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
+            .encrypt(&nonce, plaintext.as_ref())
             .expect("encryption failure");
 
         // Verify ciphertext length (plaintext + 16-byte tag)
@@ -170,7 +170,7 @@ mod tests {
 
         // Decrypt
         let decrypted = cipher
-            .decrypt(nonce, ciphertext.as_ref())
+            .decrypt(&nonce, ciphertext.as_ref())
             .expect("decryption failure");
 
         // Verify decrypted matches original
@@ -181,12 +181,12 @@ mod tests {
     fn test_tag_extraction() {
         let key: [u8; 32] = [0x00; 32];
         let nonce_bytes: [u8; GCM_NONCE_LEN] = [0x00; GCM_NONCE_LEN];
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::try_from(&nonce_bytes[..]).unwrap();
         let plaintext: [u8; PLAINTEXT_LEN] = [0x42; PLAINTEXT_LEN];
 
         let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
         let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
+            .encrypt(&nonce, plaintext.as_ref())
             .expect("encryption failure");
 
         // Extract tag
@@ -199,7 +199,7 @@ mod tests {
 
         // Verify decryption with full ciphertext works
         let decrypted = cipher
-            .decrypt(nonce, ciphertext.as_ref())
+            .decrypt(&nonce, ciphertext.as_ref())
             .expect("decryption failure");
         assert_eq!(decrypted.as_slice(), &plaintext);
     }
@@ -208,19 +208,19 @@ mod tests {
     fn test_tampered_ciphertext_fails() {
         let key: [u8; 32] = [0x00; 32];
         let nonce_bytes: [u8; GCM_NONCE_LEN] = [0x00; GCM_NONCE_LEN];
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::try_from(&nonce_bytes[..]).unwrap();
         let plaintext: [u8; PLAINTEXT_LEN] = [0x42; PLAINTEXT_LEN];
 
         let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
         let mut ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
+            .encrypt(&nonce, plaintext.as_ref())
             .expect("encryption failure");
 
         // Tamper with the ciphertext
         ciphertext[0] ^= 0x01;
 
         // Decryption should fail due to authentication tag mismatch
-        let result = cipher.decrypt(nonce, ciphertext.as_ref());
+        let result = cipher.decrypt(&nonce, ciphertext.as_ref());
         assert!(result.is_err());
     }
 
@@ -228,12 +228,12 @@ mod tests {
     fn test_tampered_tag_fails() {
         let key: [u8; 32] = [0x00; 32];
         let nonce_bytes: [u8; GCM_NONCE_LEN] = [0x00; GCM_NONCE_LEN];
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::try_from(&nonce_bytes[..]).unwrap();
         let plaintext: [u8; PLAINTEXT_LEN] = [0x42; PLAINTEXT_LEN];
 
         let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
         let mut ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
+            .encrypt(&nonce, plaintext.as_ref())
             .expect("encryption failure");
 
         // Tamper with the tag (last 16 bytes)
@@ -241,7 +241,7 @@ mod tests {
         ciphertext[tag_offset] ^= 0x01;
 
         // Decryption should fail due to authentication tag mismatch
-        let result = cipher.decrypt(nonce, ciphertext.as_ref());
+        let result = cipher.decrypt(&nonce, ciphertext.as_ref());
         assert!(result.is_err());
     }
 }
