@@ -40,8 +40,6 @@ class _PreloadScreenState extends State<PreloadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final attemptsExhausted = _clickCount >= _maxClickAttempts && !_isLoading;
-
     return Scaffold(
       body: SafeArea(
         child: GestureDetector(

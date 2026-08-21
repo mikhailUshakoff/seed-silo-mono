@@ -111,8 +111,7 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: BrandColors.sageBright,
-                          side:
-                              const BorderSide(color: BrandColors.sageBright),
+                          side: const BorderSide(color: BrandColors.sageBright),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -196,8 +195,7 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
                         ),
                         title: Text(
                           token.symbol,
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w500),
+                          style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
                         subtitle: Text(
                           token.address,

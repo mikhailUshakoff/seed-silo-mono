@@ -88,8 +88,7 @@ class _TransferScreenState extends State<TransferScreen> {
                               color: BrandColors.espressoSurfaceHigh,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                  color: BrandColors.espressoSurface,
-                                  width: 2),
+                                  color: BrandColors.espressoSurface, width: 2),
                             ),
                             child: const Icon(Icons.hub,
                                 size: 11, color: BrandColors.sageBright),

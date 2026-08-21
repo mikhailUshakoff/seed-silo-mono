@@ -74,7 +74,8 @@ class _MainScreenState extends State<MainScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: BrandColors.verified.withAlpha((0.2 * 255).toInt()),
+                        color:
+                            BrandColors.verified.withAlpha((0.2 * 255).toInt()),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                             color: BrandColors.verified

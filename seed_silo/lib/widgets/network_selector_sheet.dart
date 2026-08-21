@@ -32,7 +32,8 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
   }
 
   void _scrollToSelectedNetwork() {
-    final networkProvider = Provider.of<NetworkProvider>(context, listen: false);
+    final networkProvider =
+        Provider.of<NetworkProvider>(context, listen: false);
     final currentNetwork = networkProvider.currentNetwork;
 
     if (mounted) {

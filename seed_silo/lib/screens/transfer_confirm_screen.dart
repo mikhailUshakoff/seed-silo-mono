@@ -150,8 +150,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: const TextStyle(
-                        fontSize: 12, color: BrandColors.tan)),
+                    style:
+                        const TextStyle(fontSize: 12, color: BrandColors.tan)),
                 const SizedBox(height: 2),
                 value,
               ],
@@ -274,8 +274,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                                 ],
                               ),
                               const Divider(height: 20),
-                              _detailRow('Wallet address',
-                                  _walletAddress ?? "null"),
+                              _detailRow(
+                                  'Wallet address', _walletAddress ?? "null"),
                               _detailRow('Chain ID',
                                   '0x${_chainId?.toRadixString(16) ?? "null"}'),
                               _detailRow('Nonce',
@@ -295,8 +295,9 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                                   'Data',
                                   _transaction!.data != null
                                       ? _transaction!.data!
-                                          .map((b) =>
-                                              b.toRadixString(16).padLeft(2, '0'))
+                                          .map((b) => b
+                                              .toRadixString(16)
+                                              .padLeft(2, '0'))
                                           .join()
                                       : "null"),
                               _detailRow('Decoded Data',
@@ -321,8 +322,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                         controller: _passwordController,
                         decoration: const InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline,
-                              color: BrandColors.tan),
+                          prefixIcon:
+                              Icon(Icons.lock_outline, color: BrandColors.tan),
                         ),
                         obscureText: true,
                         enabled: _txHash == null && _isSubmitting == false,
@@ -386,8 +387,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                       ),
                       const SizedBox(height: 12),
                       const Text('Hash',
-                          style: TextStyle(
-                              fontSize: 12, color: BrandColors.tan)),
+                          style:
+                              TextStyle(fontSize: 12, color: BrandColors.tan)),
                       const SizedBox(height: 4),
                       SelectableText(
                         _txHash ?? '',
@@ -403,8 +404,8 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: BrandColors.sageBright,
-                          side: const BorderSide(
-                              color: BrandColors.borderStrong),
+                          side:
+                              const BorderSide(color: BrandColors.borderStrong),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
