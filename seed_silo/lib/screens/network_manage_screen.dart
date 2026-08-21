@@ -115,7 +115,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                       ),
                       const SizedBox(height: 16),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: TextField(
@@ -161,6 +161,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
 
                           return Card(
                             child: ListTile(
+                              titleAlignment: ListTileTitleAlignment.center,
                               leading: CircleAvatar(
                                 backgroundColor: BrandColors.sageBright
                                     .withAlpha((0.16 * 255).toInt()),
@@ -183,19 +184,21 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                                 ),
                               ),
                               isThreeLine: true,
-                              trailing: isActive
-                                  ? const Chip(
-                                      label: Text('Active'),
-                                      backgroundColor: BrandColors.verified,
-                                      labelStyle: TextStyle(
-                                          color: BrandColors.espressoDeep,
-                                          fontWeight: FontWeight.w600),
-                                    )
-                                  : IconButton(
-                                      icon: const Icon(Icons.delete_outline,
-                                          color: BrandColors.rust),
-                                      onPressed: () => _removeNetwork(network),
-                                    ),
+                              trailing: SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: isActive
+                                    ? const Center(
+                                        child: Icon(Icons.check_circle,
+                                            color: BrandColors.verified),
+                                      )
+                                    : IconButton(
+                                        icon: const Icon(Icons.delete_outline,
+                                            color: BrandColors.rust),
+                                        onPressed: () =>
+                                            _removeNetwork(network),
+                                      ),
+                              ),
                               onTap: isActive
                                   ? null
                                   : () => _switchNetwork(network),
