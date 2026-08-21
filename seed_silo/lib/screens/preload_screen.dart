@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/screens/main_screen.dart';
-//import 'package:shared_preferences/shared_preferences.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class PreloadScreen extends StatefulWidget {
   const PreloadScreen({super.key});
@@ -41,14 +41,17 @@ class _PreloadScreenState extends State<PreloadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GestureDetector(
-        onTap: _handleLogoTap,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildLogo(),
-            ],
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: _handleLogoTap,
+          behavior: HitTestBehavior.opaque,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildLogo(),
+              ],
+            ),
           ),
         ),
       ),
@@ -56,10 +59,23 @@ class _PreloadScreenState extends State<PreloadScreen> {
   }
 
   Widget _buildLogo() {
-    return Container(
-      width: 150,
-      height: 150,
-      color: Colors.red,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 400),
+      opacity: _isLoading ? 0.6 : 1,
+      child: Container(
+        width: 150,
+        height: 150,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: BrandColors.tan,
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF3A2B18), width: 1),
+        ),
+        child: Image.asset(
+          'assets/icon/seed_silo_mark.png',
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }

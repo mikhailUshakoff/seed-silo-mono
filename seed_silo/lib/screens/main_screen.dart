@@ -8,6 +8,7 @@ import 'package:seed_silo/screens/network_manage_screen.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 import 'package:seed_silo/providers/token_provider.dart';
 import 'package:seed_silo/widgets/network_selector_sheet.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -73,16 +74,18 @@ class _MainScreenState extends State<MainScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withAlpha((0.2 * 255).toInt()),
+                        color:
+                            BrandColors.verified.withAlpha((0.2 * 255).toInt()),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: Colors.green.withAlpha((0.5 * 255).toInt())),
+                            color: BrandColors.verified
+                                .withAlpha((0.5 * 255).toInt())),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.circle,
-                              size: 8, color: Colors.green),
+                              size: 8, color: BrandColors.verified),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
@@ -125,15 +128,30 @@ class _MainScreenState extends State<MainScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.token,
-                                size: 64, color: Colors.grey),
-                            const SizedBox(height: 16),
+                            Container(
+                              width: 88,
+                              height: 88,
+                              decoration: BoxDecoration(
+                                color: BrandColors.sageBright
+                                    .withAlpha((0.16 * 255).toInt()),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.token,
+                                  size: 36, color: BrandColors.sageBright),
+                            ),
+                            const SizedBox(height: 20),
                             const Text(
                               'No tokens found',
-                              style:
-                                  TextStyle(fontSize: 18, color: Colors.grey),
+                              style: TextStyle(
+                                  fontSize: 18, color: BrandColors.cream),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Add a token to start tracking it here.',
+                              style: TextStyle(
+                                  fontSize: 13, color: BrandColors.tan),
+                            ),
+                            const SizedBox(height: 12),
                             TextButton.icon(
                               icon: const Icon(Icons.add),
                               label: const Text('Add Token'),
@@ -144,32 +162,39 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       )
                     : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: tokens.length,
                         itemBuilder: (context, index) {
                           final token = tokens[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              child: Text(
-                                token.symbol.substring(0, 1).toUpperCase(),
+                          return Card(
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: BrandColors.sageBright
+                                    .withAlpha((0.16 * 255).toInt()),
+                                child: Text(
+                                  token.symbol.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: BrandColors.sageBright,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                token.symbol,
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.w500),
                               ),
-                            ),
-                            title: Text(
-                              token.symbol,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            subtitle: Text(
-                              '${token.address.substring(0, 6)}...${token.address.substring(token.address.length - 4)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
+                              subtitle: Text(
+                                '${token.address.substring(0, 6)}...${token.address.substring(token.address.length - 4)}',
+                                style: BrandColors.mono.copyWith(
+                                  fontSize: 12,
+                                  color: BrandColors.tan,
+                                ),
                               ),
+                              trailing: const Icon(Icons.arrow_forward_ios,
+                                  size: 16, color: BrandColors.tan),
+                              onTap: () => _onTokenTap(token, currentNetwork),
                             ),
-                            trailing:
-                                const Icon(Icons.arrow_forward_ios, size: 16),
-                            onTap: () => _onTokenTap(token, currentNetwork),
                           );
                         },
                       ),

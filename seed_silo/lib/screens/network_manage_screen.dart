@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/providers/network_provider.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class NetworkManageScreen extends StatefulWidget {
   const NetworkManageScreen({super.key});
@@ -62,7 +63,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: BrandColors.rust),
             child: const Text('Remove'),
           ),
         ],
@@ -98,88 +99,110 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
 
           return Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Only Ethereum compatible networks are supported.',
-                      style: TextStyle(fontSize: 14, color: Colors.white),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _rpcUrlController,
-                            decoration: const InputDecoration(
-                              labelText: 'RPC URL',
-                              hintText: 'https://...',
-                              border: OutlineInputBorder(),
+              Card(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Add Custom Network',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: BrandColors.cream,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _rpcUrlController,
+                              style: BrandColors.mono.copyWith(fontSize: 14),
+                              decoration: const InputDecoration(
+                                labelText: 'RPC URL',
+                                hintText: 'https://...',
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: isLoading ? null : _addNetwork,
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2))
-                              : const Text('Add'),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: isLoading ? null : _addNetwork,
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
+                                : const Text('Add'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const Divider(),
               Expanded(
                 child: networks.isEmpty
                     ? const Center(
-                        child: Text('No networks configured'),
+                        child: Text(
+                          'No networks configured',
+                          style: TextStyle(color: BrandColors.tan),
+                        ),
                       )
                     : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
                         itemCount: networks.length,
                         itemBuilder: (context, index) {
                           final network = networks[index];
                           final isActive = network == currentNetwork;
 
-                          return ListTile(
-                            leading: Radio<Network>(
-                              value: network,
-                              groupValue: currentNetwork,
-                              onChanged: (value) {
-                                if (value != null) _switchNetwork(value);
-                              },
-                            ),
-                            title: Text(
-                              network.name,
-                              style: TextStyle(
-                                fontWeight: isActive
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
+                          return Card(
+                            child: ListTile(
+                              titleAlignment: ListTileTitleAlignment.center,
+                              leading: CircleAvatar(
+                                backgroundColor: BrandColors.sageBright
+                                    .withAlpha((0.16 * 255).toInt()),
+                                child: const Icon(Icons.hub,
+                                    size: 18, color: BrandColors.sageBright),
                               ),
+                              title: Text(
+                                network.name,
+                                style: TextStyle(
+                                  fontWeight: isActive
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Chain ID: ${network.chainId}\n${network.rpcUrl}',
+                                style: BrandColors.mono.copyWith(
+                                  fontSize: 12,
+                                  color: BrandColors.tan,
+                                ),
+                              ),
+                              isThreeLine: true,
+                              trailing: SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: isActive
+                                    ? const Center(
+                                        child: Icon(Icons.check_circle,
+                                            color: BrandColors.verified),
+                                      )
+                                    : IconButton(
+                                        icon: const Icon(Icons.delete_outline,
+                                            color: BrandColors.rust),
+                                        onPressed: () =>
+                                            _removeNetwork(network),
+                                      ),
+                              ),
+                              onTap: isActive
+                                  ? null
+                                  : () => _switchNetwork(network),
                             ),
-                            subtitle: Text(
-                              'Chain ID: ${network.chainId}\n${network.rpcUrl}',
-                            ),
-                            isThreeLine: true,
-                            trailing: isActive
-                                ? const Chip(
-                                    label: Text('Active'),
-                                    backgroundColor: Colors.green,
-                                    labelStyle: TextStyle(color: Colors.white),
-                                  )
-                                : IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () => _removeNetwork(network),
-                                  ),
-                            onTap:
-                                isActive ? null : () => _switchNetwork(network),
                           );
                         },
                       ),
