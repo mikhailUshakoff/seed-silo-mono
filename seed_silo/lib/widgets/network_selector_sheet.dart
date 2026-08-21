@@ -50,7 +50,7 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.only(top: 12, bottom: 16),
       child: Consumer<NetworkProvider>(
         builder: (context, networkProvider, child) {
           final networks = networkProvider.networks;
@@ -69,35 +69,65 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Select Network',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: BrandColors.borderStrong,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               const SizedBox(height: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select Network',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: BrandColors.cream,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Flexible(
                 child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  shrinkWrap: true,
                   children: networks.map((network) {
                     final isActive = network == currentNetwork;
                     return ListTile(
                       key: _networkKeys[network],
-                      leading: Radio<Network>(
-                        value: network,
-                        groupValue: currentNetwork,
-                        onChanged: (value) async {
-                          if (value != null) {
-                            await networkProvider.setCurrentNetwork(value.chainId);
-                            widget.onNetworkChanged();
-                            if (mounted) {
-                              Navigator.pop(context);
-                            }
-                          }
-                        },
+                      leading: CircleAvatar(
+                        backgroundColor: BrandColors.sageBright
+                            .withAlpha((0.16 * 255).toInt()),
+                        child: const Icon(Icons.hub,
+                            size: 18, color: BrandColors.sageBright),
                       ),
-                      title: Text(network.name),
-                      subtitle: Text('Chain ID: ${network.chainId}'),
+                      title: Text(
+                        network.name,
+                        style: TextStyle(
+                          fontWeight:
+                              isActive ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Chain ID: ${network.chainId}',
+                        style: BrandColors.mono.copyWith(
+                          fontSize: 12,
+                          color: BrandColors.tan,
+                        ),
+                      ),
                       trailing: isActive
-                          ? const Icon(Icons.check, color: BrandColors.verified)
+                          ? const Icon(Icons.check_circle,
+                              color: BrandColors.verified)
                           : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       onTap: isActive
                           ? null
                           : () async {
@@ -112,9 +142,9 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                   }).toList(),
                 ),
               ),
-              const Divider(),
+              const Divider(height: 24),
               ListTile(
-                leading: const Icon(Icons.settings),
+                leading: const Icon(Icons.settings, color: BrandColors.tan),
                 title: const Text('Manage Networks'),
                 onTap: () {
                   Navigator.pop(context);
