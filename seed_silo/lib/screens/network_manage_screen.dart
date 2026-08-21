@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/providers/network_provider.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class NetworkManageScreen extends StatefulWidget {
   const NetworkManageScreen({super.key});
@@ -62,7 +63,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: BrandColors.rust),
             child: const Text('Remove'),
           ),
         ],
@@ -105,7 +106,7 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                   children: [
                     const Text(
                       'Only Ethereum compatible networks are supported.',
-                      style: TextStyle(fontSize: 14, color: Colors.white),
+                      style: TextStyle(fontSize: 14, color: BrandColors.tan),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -171,8 +172,9 @@ class _NetworkManageScreenState extends State<NetworkManageScreen> {
                             trailing: isActive
                                 ? const Chip(
                                     label: Text('Active'),
-                                    backgroundColor: Colors.green,
-                                    labelStyle: TextStyle(color: Colors.white),
+                                    backgroundColor: BrandColors.verified,
+                                    labelStyle:
+                                        TextStyle(color: BrandColors.espressoDeep),
                                   )
                                 : IconButton(
                                     icon: const Icon(Icons.delete),

@@ -8,6 +8,7 @@ import 'package:seed_silo/screens/network_manage_screen.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 import 'package:seed_silo/providers/token_provider.dart';
 import 'package:seed_silo/widgets/network_selector_sheet.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -73,16 +74,17 @@ class _MainScreenState extends State<MainScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withAlpha((0.2 * 255).toInt()),
+                        color: BrandColors.verified.withAlpha((0.2 * 255).toInt()),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: Colors.green.withAlpha((0.5 * 255).toInt())),
+                            color: BrandColors.verified
+                                .withAlpha((0.5 * 255).toInt())),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.circle,
-                              size: 8, color: Colors.green),
+                              size: 8, color: BrandColors.verified),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
@@ -126,12 +128,12 @@ class _MainScreenState extends State<MainScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.token,
-                                size: 64, color: Colors.grey),
+                                size: 64, color: BrandColors.tan),
                             const SizedBox(height: 16),
                             const Text(
                               'No tokens found',
-                              style:
-                                  TextStyle(fontSize: 18, color: Colors.grey),
+                              style: TextStyle(
+                                  fontSize: 18, color: BrandColors.tan),
                             ),
                             const SizedBox(height: 8),
                             TextButton.icon(
@@ -162,9 +164,9 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                             subtitle: Text(
                               '${token.address.substring(0, 6)}...${token.address.substring(token.address.length - 4)}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: BrandColors.tan,
                               ),
                             ),
                             trailing:

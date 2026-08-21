@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/providers/network_provider.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class NetworkSelectorSheet extends StatefulWidget {
   final VoidCallback onNetworkChanged;
@@ -95,7 +96,7 @@ class _NetworkSelectorSheetState extends State<NetworkSelectorSheet> {
                       title: Text(network.name),
                       subtitle: Text('Chain ID: ${network.chainId}'),
                       trailing: isActive
-                          ? const Icon(Icons.check, color: Colors.green)
+                          ? const Icon(Icons.check, color: BrandColors.verified)
                           : null,
                       onTap: isActive
                           ? null

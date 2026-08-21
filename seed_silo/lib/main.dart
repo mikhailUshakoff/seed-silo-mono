@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:seed_silo/screens/preload_screen.dart';
 import 'package:seed_silo/providers/network_provider.dart';
 import 'package:seed_silo/providers/token_provider.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 void main() {
   runApp(const SeedSiloApp());
@@ -24,7 +25,7 @@ class SeedSiloApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Seed Silo',
-        theme: ThemeData.dark(),
+        theme: AppTheme.dark,
         home: const PreloadScreen(),
       ),
     );
