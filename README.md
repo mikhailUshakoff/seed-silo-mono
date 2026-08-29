@@ -1,6 +1,6 @@
 # Seed Silo - ESP32 Hardware Wallet
 
-<img src="seed_silo/assets/icon/seed_silo_mark.png" alt="Seed Silo icon" width="120">
+<img src="seed_silo/assets/icon/readme_banner.svg" alt="Seed Silo" width="100%">
 
 Hardware crypto wallet built on ESP32. Stores an encrypted seed, derives keys, and signs transactions on-device; a Flutter app talks to it over USB serial.
 
