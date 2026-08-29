@@ -63,7 +63,8 @@ class _MainScreenState extends State<MainScreen> {
               children: [
                 const Text('Tokens'),
                 const SizedBox(width: 8),
-                const Text('•', style: TextStyle(fontSize: 20)),
+                const Text('•',
+                    style: TextStyle(fontSize: 20, color: BrandColors.tan)),
                 const SizedBox(width: 8),
                 Flexible(
                   child: GestureDetector(
@@ -113,6 +114,8 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           body: RefreshIndicator(
+            color: BrandColors.sageBright,
+            backgroundColor: BrandColors.espressoSurfaceHigh,
             onRefresh: () async {
               final tokenProvider =
                   Provider.of<TokenProvider>(context, listen: false);
@@ -172,7 +175,9 @@ class _MainScreenState extends State<MainScreen> {
                                 backgroundColor: BrandColors.sageBright
                                     .withAlpha((0.16 * 255).toInt()),
                                 child: Text(
-                                  token.symbol.substring(0, 1).toUpperCase(),
+                                  token.symbol.isNotEmpty
+                                      ? token.symbol[0].toUpperCase()
+                                      : '?',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: BrandColors.sageBright,
@@ -180,7 +185,9 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                               ),
                               title: Text(
-                                token.symbol,
+                                token.symbol.isNotEmpty
+                                    ? token.symbol
+                                    : 'Unknown',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w500),
                               ),
