@@ -29,7 +29,8 @@ class _PreloadScreenState extends State<PreloadScreen> {
 
     setState(() => _isLoading = false);
 
-    if (version != null) {
+    //if (version != null) {
+    if (true) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainScreen()),
       );

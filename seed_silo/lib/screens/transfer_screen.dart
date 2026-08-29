@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard;
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/models/token.dart';
 import 'package:seed_silo/screens/transfer_confirm_screen.dart';
@@ -20,11 +21,23 @@ class _TransferScreenState extends State<TransferScreen> {
   final TextEditingController _destinationController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
 
+  static final RegExp _addressPattern = RegExp(r'^0x[a-fA-F0-9]{40}$');
+
   @override
   void dispose() {
     _destinationController.dispose();
     _amountController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pasteDestination() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim();
+    if (text == null || text.isEmpty) return;
+    _destinationController.text = text;
+    _destinationController.selection = TextSelection.collapsed(
+      offset: text.length,
+    );
   }
 
   void _onTransferPressed() async {
@@ -160,21 +173,36 @@ class _TransferScreenState extends State<TransferScreen> {
                     TextFormField(
                       controller: _destinationController,
                       style: BrandColors.mono.copyWith(fontSize: 14),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Destination Address',
                         hintText: '0x...',
-                        prefixIcon: Icon(Icons.account_balance_wallet_outlined,
+                        prefixIcon: const Icon(
+                            Icons.account_balance_wallet_outlined,
                             color: BrandColors.tan),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.content_paste,
+                              color: BrandColors.tan, size: 18),
+                          tooltip: 'Paste',
+                          onPressed: _pasteDestination,
+                        ),
                       ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Please enter destination address'
-                          : null,
+                      validator: (value) {
+                        final trimmed = value?.trim() ?? '';
+                        if (trimmed.isEmpty) {
+                          return 'Please enter destination address';
+                        }
+                        if (!_addressPattern.hasMatch(trimmed)) {
+                          return 'Enter a valid 0x address';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     FormattedAmountField(
                       controller: _amountController,
                       label: 'Amount',
                       decimals: widget.token.decimals,
+                      symbol: widget.token.symbol,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter amount';

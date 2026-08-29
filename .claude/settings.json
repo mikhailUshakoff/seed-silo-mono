@@ -3,5 +3,8 @@
     "deny": [
       "Read(firmware/include/core/input.h)"
     ]
+  },
+  "enabledPlugins": {
+    "flutter-ui@flutter-claude-code": true
   }
 }

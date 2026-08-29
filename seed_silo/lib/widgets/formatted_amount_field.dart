@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:seed_silo/theme/app_theme.dart';
 
 class FormattedAmountField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final int decimals;
+  final String? symbol;
   final String? Function(String?)? validator;
 
   const FormattedAmountField({
@@ -12,6 +14,7 @@ class FormattedAmountField extends StatefulWidget {
     required this.controller,
     required this.label,
     required this.decimals,
+    this.symbol,
     this.validator,
   });
 
@@ -115,14 +118,13 @@ class _FormattedAmountFieldState extends State<FormattedAmountField> {
           ],
           validator: widget.validator,
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Text('Value: $_convertedValue'),
-            const SizedBox(width: 16),
-            Text('Input length: $_inputLength'),
-          ],
-        ),
+        if (_inputLength > 0) ...[
+          const SizedBox(height: 6),
+          Text(
+            '= $_convertedValue${widget.symbol != null ? ' ${widget.symbol}' : ''}',
+            style: const TextStyle(fontSize: 14, color: BrandColors.tan),
+          ),
+        ],
       ],
     );
   }
