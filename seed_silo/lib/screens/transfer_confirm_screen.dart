@@ -367,10 +367,11 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
             ],
             const SizedBox(height: 24),
             Visibility(
-              visible: !_showTxInfo,
+              visible: _txHash == null,//!_showTxInfo,
               maintainState: true,
               child: SubmitSlider(
                 onSubmit: _submitTransaction,
+                loading: _isSubmitting,
               ),
             ),
             if (_txHash != null) ...[
