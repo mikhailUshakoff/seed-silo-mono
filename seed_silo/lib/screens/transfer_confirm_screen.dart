@@ -62,9 +62,9 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     );
 
     if (walletAddress == null) {
+      if (!mounted) return;
       _passwordController.text = '';
       _passwordPosController.text = '';
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not receive wallet address')),
       );
@@ -83,9 +83,9 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     );
 
     if (bTx == null) {
+      if (!mounted) return;
       _passwordController.text = '';
       _passwordPosController.text = '';
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Can not build transaction')),
       );
@@ -107,6 +107,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
       _transaction!,
       _chainId!.toInt(),
     );
+    if (!mounted) return;
     _passwordController.text = '';
     _passwordPosController.text = '';
     String txHash = sendResult ?? "0x";
@@ -309,66 +310,70 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                     )
                   : const SizedBox.shrink(),
             ),
-            const SizedBox(height: 16),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon:
-                              Icon(Icons.lock_outline, color: BrandColors.tan),
+            if (!_isSubmitting && _txHash == null) ...[
+              const SizedBox(height: 16),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: const InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: Icon(Icons.lock_outline,
+                                color: BrandColors.tan),
+                          ),
+                          obscureText: true,
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'Please enter password'
+                              : null,
                         ),
-                        obscureText: true,
-                        enabled: _txHash == null && _isSubmitting == false,
-                        validator: (value) => value == null || value.isEmpty
-                            ? 'Please enter password'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordPosController,
-                        decoration: const InputDecoration(
-                          labelText: 'Password Pos',
-                          prefixIcon: Icon(Icons.tag, color: BrandColors.tan),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordPosController,
+                          decoration: const InputDecoration(
+                            labelText: 'Password Pos',
+                            prefixIcon:
+                                Icon(Icons.tag, color: BrandColors.tan),
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter password position';
+                            }
+                            final position = int.tryParse(value);
+                            if (position == null) {
+                              return 'Please enter a valid number';
+                            }
+                            if (position < 0 || position > 224) {
+                              // 256 - 32
+                              return 'Password position must be between 0 and 224';
+                            }
+                            return null;
+                          },
                         ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        enabled: _txHash == null && _isSubmitting == false,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter password position';
-                          }
-                          final position = int.tryParse(value);
-                          if (position == null) {
-                            return 'Please enter a valid number';
-                          }
-                          if (position < 0 || position > 224) {
-                            // 256 - 32
-                            return 'Password position must be between 0 and 224';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 24),
-            if (_txHash == null) ...[
-              SubmitSlider(
+            Visibility(
+              visible: !_showTxInfo,
+              maintainState: true,
+              child: SubmitSlider(
                 onSubmit: _submitTransaction,
               ),
-            ] else ...[
+            ),
+            if (_txHash != null) ...[
               Card(
                 margin: EdgeInsets.zero,
                 child: Padding(
