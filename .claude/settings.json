@@ -5,6 +5,8 @@
     ]
   },
   "enabledPlugins": {
-    "flutter-ui@flutter-claude-code": true
+    "flutter-architecture@flutter-claude-code": true,
+    "flutter-patterns@flutter-claude-code": true,
+    "flutter-testing-performance@flutter-claude-code": true
   }
 }
