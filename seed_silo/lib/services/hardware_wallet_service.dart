@@ -96,9 +96,9 @@ class HardwareWalletService {
     return bytes.buffer.asUint8List();
   }
 
-  /// Sends the transaction to the device and waits until the user approves or
-  /// rejects it. Throws [HardwareWalletException] if the device can not be
-  /// reached or responds with an error code.
+/// Requests a transaction signature from the device. Display-capable devices
+/// wait for user approval; devices without confirmation UI may respond
+/// immediately. Throws [HardwareWalletException] on transport/device errors.
   Future<MsgSignature> getSignature(
       Uint8List password, int pos, Uint8List rawTransaction) async {
     final request = [getSignatureCmd];
