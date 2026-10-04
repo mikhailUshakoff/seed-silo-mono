@@ -12,9 +12,9 @@ class NetworkService {
   static const String _currentNetworkKey = 'current_network';
 
   static final Network defaultNetwork = Network(
-    name: 'Ethereum Holesky',
-    rpcUrl: 'https://ethereum-holesky-rpc.publicnode.com',
-    chainId: 17000,
+    name: 'Ethereum Hoodi',
+    rpcUrl: 'https://0xrpc.io/hoodi',
+    chainId: 560048,
   );
 
   /// Get all configured networks from storage
