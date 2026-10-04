@@ -215,60 +215,63 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                 ),
               ),
             ),
-            if (!_isSubmitting) ...[
-              const SizedBox(height: 16),
-              Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock_outline,
-                                color: BrandColors.tan),
-                          ),
-                          obscureText: true,
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Please enter password'
-                              : null,
+            // Kept in the tree (only disabled) while submitting: removing it
+            // shifts the slider's index in the ListView, which disposes the
+            // slider mid-submit and crashes slide_to_act's reset().
+            const SizedBox(height: 16),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _passwordController,
+                        enabled: !_isSubmitting,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon:
+                              Icon(Icons.lock_outline, color: BrandColors.tan),
                         ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordPosController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password Pos',
-                            prefixIcon: Icon(Icons.tag, color: BrandColors.tan),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter password position';
-                            }
-                            final position = int.tryParse(value);
-                            if (position == null) {
-                              return 'Please enter a valid number';
-                            }
-                            if (position < 0 || position > 224) {
-                              // 256 - 32
-                              return 'Password position must be between 0 and 224';
-                            }
-                            return null;
-                          },
+                        obscureText: true,
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Please enter password'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordPosController,
+                        enabled: !_isSubmitting,
+                        decoration: const InputDecoration(
+                          labelText: 'Password Pos',
+                          prefixIcon: Icon(Icons.tag, color: BrandColors.tan),
                         ),
-                      ],
-                    ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter password position';
+                          }
+                          final position = int.tryParse(value);
+                          if (position == null) {
+                            return 'Please enter a valid number';
+                          }
+                          if (position < 0 || position > 224) {
+                            // 256 - 32
+                            return 'Password position must be between 0 and 224';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
             const SizedBox(height: 24),
             SubmitSlider(
               onSubmit: _submitTransaction,
