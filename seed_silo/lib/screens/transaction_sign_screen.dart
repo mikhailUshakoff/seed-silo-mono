@@ -15,8 +15,7 @@ enum _SignStatus { waiting, sent, rejected, failed }
 const int _txRejectedCode = 0x0d;
 const String _erc20TransferSelector = 'a9059cbb';
 
-/// Shows the built transaction, sends it to the device for signing and waits
-/// for the user to approve or reject it on the device.
+/// Shows the built transaction and requests its signature from the device.
 class TransactionSignScreen extends StatefulWidget {
   final Token token;
   final Network network;
