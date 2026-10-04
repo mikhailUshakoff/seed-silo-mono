@@ -86,8 +86,8 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
   }
 
   void _finish(_SignStatus status, {String? txHash, String? error}) {
-    _pulse.stop();
-    if (!mounted) return;
+if (!mounted) return;
+_pulse.stop();
     setState(() {
       _status = status;
       _txHash = txHash;
