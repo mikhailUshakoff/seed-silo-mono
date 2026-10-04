@@ -12,6 +12,45 @@ class Version {
   Version(this.major, this.minor, this.patch);
 }
 
+/// Error returned by the device (or the transport) while executing a command.
+/// [code] is the firmware error code from `firmware/include/core/constants.h`,
+/// or null when the device could not be reached / sent a malformed response.
+class HardwareWalletException implements Exception {
+  final int? code;
+  final String message;
+
+  HardwareWalletException(this.message, {this.code});
+
+  factory HardwareWalletException.fromCode(int code) =>
+      HardwareWalletException(_messages[code] ?? 'Unknown device error',
+          code: code);
+
+  static const Map<int, String> _messages = {
+    0x02: 'Unknown command',
+    0x03: 'Wrong data format',
+    0x04: 'Wrong recovery ID',
+    0x05: 'Invalid parameters',
+    0x06: 'Invalid password position',
+    0x07: 'Failed to set up encryption key',
+    0x08: 'Decryption failed (wrong password or position?)',
+    0x09: 'Failed to create public key',
+    0x0a: 'Failed to serialize public key',
+    0x0b: 'Failed to create signature',
+    0x0c: 'Failed to serialize signature',
+    0x0d: 'Transaction was rejected on the device',
+    0x0e: 'Not a type-2 (EIP-1559) transaction',
+    0x0f: 'Failed to parse RLP list',
+    0x10: 'Invalid RLP list length',
+    0x11: 'Failed to parse RLP field',
+    0x12: 'Transaction data is not an EIP-20 transfer',
+  };
+
+  @override
+  String toString() => code == null
+      ? message
+      : '$message (code 0x${code!.toRadixString(16).padLeft(2, '0')})';
+}
+
 class HardwareWalletService {
   static final HardwareWalletService _instance =
       HardwareWalletService._internal();
@@ -57,7 +96,10 @@ class HardwareWalletService {
     return bytes.buffer.asUint8List();
   }
 
-  Future<MsgSignature?> getSignature(
+/// Requests a transaction signature from the device. Display-capable devices
+/// wait for user approval; devices without confirmation UI may respond
+/// immediately. Throws [HardwareWalletException] on transport/device errors.
+  Future<MsgSignature> getSignature(
       Uint8List password, int pos, Uint8List rawTransaction) async {
     final request = [getSignatureCmd];
     request.addAll(password);
@@ -68,7 +110,9 @@ class HardwareWalletService {
 
     final ok = await SerialService().write(request);
     nullifyListInt(request);
-    if (ok == null) return null;
+    if (ok == null) {
+      throw HardwareWalletException('Can not connect to the device');
+    }
 
     Uint8List? buffer;
     while (buffer == null || buffer.isEmpty) {
@@ -78,8 +122,11 @@ class HardwareWalletService {
 
     SerialService().close();
 
-    if (buffer.length != 66 || buffer[0] != successCode) {
-      return null;
+    if (buffer[0] != successCode) {
+      throw HardwareWalletException.fromCode(buffer[0]);
+    }
+    if (buffer.length != 66) {
+      throw HardwareWalletException('Unexpected device response');
     }
 
     // signature

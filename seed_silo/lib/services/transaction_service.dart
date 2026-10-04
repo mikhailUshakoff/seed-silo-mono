@@ -149,11 +149,14 @@ class TransactionService {
     return buffer.toString();
   }
 
-  Future<String?> sendTransaction(Uint8List textPassword, int posPassword,
+  /// Signs [tx] on the device and broadcasts it. Returns the tx hash.
+  /// Throws [HardwareWalletException] if the device fails or the user
+  /// rejects the transaction, or the RPC error if broadcasting fails.
+  Future<String> sendTransaction(Uint8List textPassword, int posPassword,
       String rpcUrl, Transaction tx, int chainId) async {
     if (!tx.isEIP1559) {
       nullifyUint8List(textPassword);
-      return null;
+      throw ArgumentError('Only EIP-1559 transactions are supported');
     }
 
     final password = keccak256(textPassword);
@@ -162,9 +165,6 @@ class TransactionService {
     final rawTransaction = tx.getUnsignedSerialized(chainId: chainId);
     final sig = await HardwareWalletService()
         .getSignature(password, posPassword, rawTransaction);
-    if (sig == null) {
-      return null;
-    }
 
     final signedTransaction = _encodeEIP1559ToRlp(tx, sig, chainId);
     final signedRlp = encode(signedTransaction); //rlp

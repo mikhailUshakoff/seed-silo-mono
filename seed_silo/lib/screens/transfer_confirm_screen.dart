@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:seed_silo/models/network.dart';
+import 'package:seed_silo/screens/transaction_sign_screen.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
@@ -30,17 +31,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordPosController = TextEditingController();
 
-  String? _txHash;
   bool _isSubmitting = false;
-  Transaction? _transaction;
-  int? _chainId;
-  bool _showTxInfo = false;
-  String? _walletAddress;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void dispose() {
@@ -49,81 +40,73 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     super.dispose();
   }
 
+  void _clearPassword() {
+    _passwordController.text = '';
+    _passwordPosController.text = '';
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    _clearPassword();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+    setState(() => _isSubmitting = false);
+  }
+
   Future<void> _submitTransaction() async {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
+    final passwordPos = int.parse(_passwordPosController.text);
+
     // Get wallet address
     final walletAddress = await TransactionService().getAddress(
       Uint8List.fromList(_passwordController.text.codeUnits),
-      int.parse(_passwordPosController.text),
+      passwordPos,
     );
-
     if (walletAddress == null) {
-      if (!mounted) return;
-      _passwordController.text = '';
-      _passwordPosController.text = '';
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Can not receive wallet address')),
-      );
-      setState(() => _isSubmitting = false);
+      _showError('Can not receive wallet address');
       return;
     }
 
-    _walletAddress = walletAddress;
-
-    final bTx = await TransactionService().buildEip1559Transaction(
-      walletAddress,
-      widget.token.address,
-      widget.network.rpcUrl,
-      widget.destination,
-      widget.amount,
-    );
-
-    if (bTx == null) {
-      if (!mounted) return;
-      _passwordController.text = '';
-      _passwordPosController.text = '';
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Can not build transaction')),
+    final Transaction? tx;
+    try {
+      tx = await TransactionService().buildEip1559Transaction(
+        walletAddress,
+        widget.token.address,
+        widget.network.rpcUrl,
+        widget.destination,
+        widget.amount,
       );
-      setState(() => _isSubmitting = false);
+    } catch (e) {
+      _showError('Can not build transaction: $e');
+      return;
+    }
+    if (tx == null) {
+      _showError('Can not build transaction');
       return;
     }
 
     if (!mounted) return;
-    _chainId = widget.network.chainId;
-    _transaction = bTx;
-    setState(() {
-      _showTxInfo = true;
-    });
+    final password = Uint8List.fromList(_passwordController.text.codeUnits);
+    _clearPassword();
+    setState(() => _isSubmitting = false);
 
-    final sendResult = await TransactionService().sendTransaction(
-      Uint8List.fromList(_passwordController.text.codeUnits),
-      int.parse(_passwordPosController.text),
-      widget.network.rpcUrl,
-      _transaction!,
-      _chainId!.toInt(),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TransactionSignScreen(
+          token: widget.token,
+          network: widget.network,
+          walletAddress: walletAddress,
+          transaction: tx!,
+          password: password,
+          passwordPos: passwordPos,
+        ),
+      ),
     );
-    if (!mounted) return;
-    _passwordController.text = '';
-    _passwordPosController.text = '';
-    String txHash = sendResult ?? "0x";
-
-    setState(() {
-      _txHash = txHash;
-    });
-  }
-
-  void _copyHash() {
-    if (_txHash != null) {
-      Clipboard.setData(ClipboardData(text: _txHash!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction hash copied')),
-      );
-    }
   }
 
   Widget _summaryRow({
@@ -157,25 +140,6 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                 value,
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: BrandColors.tan)),
-          const SizedBox(height: 2),
-          SelectableText(
-            value,
-            style: BrandColors.mono
-                .copyWith(fontSize: 12, color: BrandColors.cream),
           ),
         ],
       ),
@@ -251,184 +215,68 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                 ),
               ),
             ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child: _showTxInfo
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Card(
-                        margin: EdgeInsets.zero,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.receipt_long,
-                                      size: 16, color: BrandColors.sageBright),
-                                  const SizedBox(width: 8),
-                                  const Text('Transaction Details',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w700)),
-                                ],
-                              ),
-                              const Divider(height: 20),
-                              _detailRow(
-                                  'Wallet address', _walletAddress ?? "null"),
-                              _detailRow('Chain ID',
-                                  '0x${_chainId?.toRadixString(16) ?? "null"}'),
-                              _detailRow('Nonce',
-                                  '0x${_transaction!.nonce?.toRadixString(16) ?? "null"}'),
-                              _detailRow('Max Priority Fee Per Gas',
-                                  '0x${_transaction!.maxPriorityFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${TransactionService().convert2Decimal(_transaction!.maxPriorityFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
-                              _detailRow('Max Fee Per Gas',
-                                  '0x${_transaction!.maxFeePerGas?.getInWei.toRadixString(16) ?? "null"} (${TransactionService().convert2Decimal(_transaction!.maxFeePerGas?.getInWei ?? BigInt.zero, 9)} Gwei)'),
-                              _detailRow('Gas limit',
-                                  '0x${_transaction!.maxGas?.toRadixString(16) ?? "null"} (${_transaction!.maxGas != null ? TransactionService().convert2Decimal(BigInt.from(_transaction!.maxGas!), 9) : "null"} Gwei)'),
-                              const Divider(height: 20),
-                              _detailRow(
-                                  'To', _transaction!.to?.with0x ?? "null"),
-                              _detailRow('Value (in wei)',
-                                  '0x${_transaction!.value?.getInWei.toRadixString(16) ?? "null"}'),
-                              _detailRow(
-                                  'Data',
-                                  _transaction!.data != null
-                                      ? _transaction!.data!
-                                          .map((b) => b
-                                              .toRadixString(16)
-                                              .padLeft(2, '0'))
-                                          .join()
-                                      : "null"),
-                              _detailRow('Decoded Data',
-                                  '${_transaction!.data != null ? TransactionService().decodeTransactionData(_transaction!.data, widget.token.decimals) : "null"}'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            if (!_isSubmitting && _txHash == null) ...[
-              const SizedBox(height: 16),
-              Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock_outline,
-                                color: BrandColors.tan),
-                          ),
-                          obscureText: true,
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Please enter password'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordPosController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password Pos',
-                            prefixIcon:
-                                Icon(Icons.tag, color: BrandColors.tan),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter password position';
-                            }
-                            final position = int.tryParse(value);
-                            if (position == null) {
-                              return 'Please enter a valid number';
-                            }
-                            if (position < 0 || position > 224) {
-                              // 256 - 32
-                              return 'Password position must be between 0 and 224';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            Visibility(
-              visible: _txHash == null,//!_showTxInfo,
-              maintainState: true,
-              child: SubmitSlider(
-                onSubmit: _submitTransaction,
-                loading: _isSubmitting,
-              ),
-            ),
-            if (_txHash != null) ...[
-              Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
+            // Kept in the tree (only disabled) while submitting: removing it
+            // shifts the slider's index in the ListView, which disposes the
+            // slider mid-submit and crashes slide_to_act's reset().
+            const SizedBox(height: 16),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.check_circle,
-                              color: BrandColors.verified),
-                          const SizedBox(width: 8),
-                          const Text('Transaction sent',
-                              style: TextStyle(fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('Hash',
-                          style:
-                              TextStyle(fontSize: 12, color: BrandColors.tan)),
-                      const SizedBox(height: 4),
-                      SelectableText(
-                        _txHash ?? '',
-                        style: BrandColors.mono.copyWith(fontSize: 13),
+                      TextFormField(
+                        controller: _passwordController,
+                        enabled: !_isSubmitting,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon:
+                              Icon(Icons.lock_outline, color: BrandColors.tan),
+                        ),
+                        obscureText: true,
+                        validator: (value) => value == null || value.isEmpty
+                            ? 'Please enter password'
+                            : null,
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _copyHash,
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Copy Hash'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: BrandColors.sageBright,
-                          side:
-                              const BorderSide(color: BrandColors.borderStrong),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          minimumSize: const Size.fromHeight(48),
+                      TextFormField(
+                        controller: _passwordPosController,
+                        enabled: !_isSubmitting,
+                        decoration: const InputDecoration(
+                          labelText: 'Password Pos',
+                          prefixIcon: Icon(Icons.tag, color: BrandColors.tan),
                         ),
-                        onPressed: () {
-                          Navigator.of(context)
-                              .popUntil((route) => route.isFirst);
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter password position';
+                          }
+                          final position = int.tryParse(value);
+                          if (position == null) {
+                            return 'Please enter a valid number';
+                          }
+                          if (position < 0 || position > 224) {
+                            // 256 - 32
+                            return 'Password position must be between 0 and 224';
+                          }
+                          return null;
                         },
-                        child: const Text('Done'),
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
+            ),
+            const SizedBox(height: 24),
+            SubmitSlider(
+              onSubmit: _submitTransaction,
+              loading: _isSubmitting,
+            ),
           ],
         ),
       ),
