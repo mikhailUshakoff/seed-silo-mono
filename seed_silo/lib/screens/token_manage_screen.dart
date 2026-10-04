@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:seed_silo/models/token.dart';
-import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/screens/network_manage_screen.dart';
+import 'package:seed_silo/providers/network_provider.dart';
 import 'package:seed_silo/providers/token_provider.dart';
 import 'package:seed_silo/theme/app_theme.dart';
 
 class TokenManageScreen extends StatefulWidget {
-  final Network currentNetwork;
-
-  const TokenManageScreen({super.key, required this.currentNetwork});
+  const TokenManageScreen({super.key});
 
   @override
   State<TokenManageScreen> createState() => _TokenManageScreenState();
@@ -29,8 +27,9 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
     if (address.isEmpty) return;
 
     final tokenProvider = context.read<TokenProvider>();
+    final network = context.read<NetworkProvider>().currentNetwork;
 
-    final result = await tokenProvider.addToken(widget.currentNetwork, address);
+    final result = await tokenProvider.addToken(network, address);
 
     if (!mounted) return;
 
@@ -44,9 +43,11 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _removeToken(Token token) async {
-    final result = await context
-        .read<TokenProvider>()
-        .removeToken(widget.currentNetwork.chainId, token.address);
+    final tokenProvider = context.read<TokenProvider>();
+    if (tokenProvider.isLoading) return;
+
+    final chainId = context.read<NetworkProvider>().currentNetwork.chainId;
+    final result = await tokenProvider.removeToken(chainId, token.address);
 
     if (!mounted) return;
 
@@ -66,6 +67,8 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentNetwork = context.watch<NetworkProvider>().currentNetwork;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manage tokens'),
@@ -97,7 +100,7 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
                                   fontSize: 12, color: BrandColors.tan),
                             ),
                             Text(
-                              widget.currentNetwork.name,
+                              currentNetwork.name,
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium

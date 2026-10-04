@@ -18,10 +18,9 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  void _navigateToManageTokens(Network currentNetwork) async {
+  void _navigateToManageTokens() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-          builder: (_) => TokenManageScreen(currentNetwork: currentNetwork)),
+      MaterialPageRoute(builder: (_) => const TokenManageScreen()),
     );
   }
 
@@ -108,7 +107,7 @@ class _MainScreenState extends State<MainScreen> {
               IconButton(
                 icon: const Icon(Icons.settings),
                 tooltip: 'Manage Tokens',
-                onPressed: () => _navigateToManageTokens(currentNetwork),
+                onPressed: () => _navigateToManageTokens(),
               ),
               const SizedBox(width: 8),
             ],
@@ -159,7 +158,7 @@ class _MainScreenState extends State<MainScreen> {
                               icon: const Icon(Icons.add),
                               label: const Text('Add Token'),
                               onPressed: () =>
-                                  _navigateToManageTokens(currentNetwork),
+                                  _navigateToManageTokens(),
                             ),
                           ],
                         ),

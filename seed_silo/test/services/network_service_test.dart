@@ -16,10 +16,10 @@ void main() {
       final networks = await networkService.getNetworks();
 
       expect(networks.length, 1);
-      expect(networks.first.name, 'Ethereum Holesky');
-      expect(networks.first.chainId, 17000);
+      expect(networks.first.name, 'Ethereum Hoodi');
+      expect(networks.first.chainId, 560048);
       expect(
-          networks.first.rpcUrl, 'https://ethereum-holesky-rpc.publicnode.com');
+          networks.first.rpcUrl, 'https://0xrpc.io/hoodi');
     });
   });
 }
