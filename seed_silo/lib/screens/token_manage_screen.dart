@@ -43,9 +43,11 @@ class _TokenManageScreenState extends State<TokenManageScreen> {
   }
 
   Future<void> _removeToken(Token token) async {
+    final tokenProvider = context.read<TokenProvider>();
+    if (tokenProvider.isLoading) return;
+
     final chainId = context.read<NetworkProvider>().currentNetwork.chainId;
-    final result =
-        await context.read<TokenProvider>().removeToken(chainId, token.address);
+    final result = await tokenProvider.removeToken(chainId, token.address);
 
     if (!mounted) return;
 
