@@ -86,8 +86,8 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
   }
 
   void _finish(_SignStatus status, {String? txHash, String? error}) {
-if (!mounted) return;
-_pulse.stop();
+    if (!mounted) return;
+    _pulse.stop();
     setState(() {
       _status = status;
       _txHash = txHash;
@@ -106,7 +106,15 @@ _pulse.stop();
   // Formatting
   // ---------------------------------------------------------------------------
 
-  String _hex(BigInt? v) => v == null ? '—' : '0x${v.toRadixString(16)}';
+  /// Whole bytes, like the device prints them (`%02x` per byte): 0x88bb0 is
+  /// shown as 0x088bb0. Zero is an empty RLP value, which the device shows
+  /// as 0x0.
+  String _hex(BigInt? v) {
+    if (v == null) return '—';
+    if (v == BigInt.zero) return '0x0';
+    final digits = v.toRadixString(16);
+    return '0x${digits.length.isOdd ? '0$digits' : digits}';
+  }
 
   /// [TransactionService.convert2Decimal] keeps every fractional digit;
   /// for display trim the trailing zeros (and separators) away.
@@ -440,8 +448,7 @@ _pulse.stop();
     return _sectionCard(
       title: 'Verify on device',
       children: [
-        _field('Chain ID', '$chainId',
-            deviceHex: '0x${chainId.toRadixString(16)}'),
+        _field('Chain ID', '$chainId', deviceHex: _hex(BigInt.from(chainId))),
         _field('Nonce', tx.nonce?.toString() ?? '—',
             deviceHex: tx.nonce == null ? null : _hex(BigInt.from(tx.nonce!))),
         _field('Max priority fee', _gwei(tx.maxPriorityFeePerGas),
