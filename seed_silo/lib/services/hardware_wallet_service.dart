@@ -51,6 +51,12 @@ class HardwareWalletException implements Exception {
       : '$message (code 0x${code!.toRadixString(16).padLeft(2, '0')})';
 }
 
+/// Thrown by [HardwareWalletService.getSignature] when the pending request was
+/// cancelled via [HardwareWalletService.cancelSignature].
+class HardwareWalletCancelledException extends HardwareWalletException {
+  HardwareWalletCancelledException() : super('Signing cancelled');
+}
+
 class HardwareWalletService {
   static final HardwareWalletService _instance =
       HardwareWalletService._internal();
@@ -65,6 +71,8 @@ class HardwareWalletService {
   static const int successCode = 0x01;
 
   static const Duration readTimeout = Duration(milliseconds: 500);
+
+  bool _cancelSignatureRequested = false;
 
   Future<Version?> getVersion() async {
     final ok = await SerialService().write([getVersionCmd]);
@@ -98,9 +106,11 @@ class HardwareWalletService {
 
 /// Requests a transaction signature from the device. Display-capable devices
 /// wait for user approval; devices without confirmation UI may respond
-/// immediately. Throws [HardwareWalletException] on transport/device errors.
+/// immediately. Throws [HardwareWalletException] on transport/device errors,
+/// or [HardwareWalletCancelledException] after [cancelSignature].
   Future<MsgSignature> getSignature(
       Uint8List password, int pos, Uint8List rawTransaction) async {
+    _cancelSignatureRequested = false;
     final request = [getSignatureCmd];
     request.addAll(password);
     nullifyUint8List(password);
@@ -118,8 +128,17 @@ class HardwareWalletService {
     while (buffer == null || buffer.isEmpty) {
       await Future.delayed(readTimeout);
       buffer = await SerialService().read(66);
+      if ((buffer == null || buffer.isEmpty) && _cancelSignatureRequested) {
+        _cancelSignatureRequested = false;
+        // Any new command makes the device drop the pending signature, so a
+        // version request interrupts its confirmation screen. getVersion()
+        // also consumes the reply and closes the port.
+        await getVersion();
+        throw HardwareWalletCancelledException();
+      }
     }
 
+    _cancelSignatureRequested = false;
     SerialService().close();
 
     if (buffer[0] != successCode) {
@@ -137,6 +156,13 @@ class HardwareWalletService {
     final sig = MsgSignature(BigInt.parse(bytesToHex(r), radix: 16),
         BigInt.parse(bytesToHex(s), radix: 16), v);
     return sig;
+  }
+
+  /// Interrupts a [getSignature] call that is waiting for user confirmation
+  /// on the device. If the device already answered, the answer wins and
+  /// [getSignature] completes normally.
+  void cancelSignature() {
+    _cancelSignatureRequested = true;
   }
 
   Future<Uint8List?> getUncompressedPublicKey(

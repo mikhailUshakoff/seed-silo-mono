@@ -45,6 +45,7 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
   _SignStatus _status = _SignStatus.waiting;
   String? _txHash;
   String? _error;
+  bool _cancelling = false;
 
   late final AnimationController _pulse = AnimationController(
     vsync: this,
@@ -75,6 +76,8 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
         widget.network.chainId,
       );
       _finish(_SignStatus.sent, txHash: txHash);
+    } on HardwareWalletCancelledException {
+      if (mounted) Navigator.of(context).pop();
     } on HardwareWalletException catch (e) {
       _finish(
         e.code == _txRejectedCode ? _SignStatus.rejected : _SignStatus.failed,
@@ -83,6 +86,14 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     } catch (e) {
       _finish(_SignStatus.failed, error: 'Failed to send transaction: $e');
     }
+  }
+
+  /// Asks the device to drop the pending request; the screen pops once the
+  /// device has been interrupted (see [_sign]).
+  void _cancel() {
+    if (_cancelling || _status != _SignStatus.waiting) return;
+    setState(() => _cancelling = true);
+    HardwareWalletService().cancelSignature();
   }
 
   void _finish(_SignStatus status, {String? txHash, String? error}) {
@@ -485,18 +496,35 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     final Widget child;
     switch (_status) {
       case _SignStatus.waiting:
-        child = const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child = Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: BrandColors.pending),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: BrandColors.pending),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                    _cancelling
+                        ? 'Cancelling on device…'
+                        : 'Waiting for device — keep it connected',
+                    style: const TextStyle(
+                        fontSize: 13, color: BrandColors.tan)),
+              ],
             ),
-            SizedBox(width: 10),
-            Text('Waiting for device — keep it connected',
-                style: TextStyle(fontSize: 13, color: BrandColors.tan)),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52)),
+              onPressed: _cancelling ? null : _cancel,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Back'),
+            ),
           ],
         );
       case _SignStatus.sent:
@@ -533,12 +561,22 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
 
     return PopScope(
       // The device is still waiting for the user; leaving now would orphan
-      // the pending signing request on the serial port.
+      // the pending signing request on the serial port, so a back gesture
+      // cancels it on the device first and the screen pops afterwards.
       canPop: !waiting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _cancel();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Sign Transaction'),
-          automaticallyImplyLeading: !waiting,
+          leading: waiting
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Cancel and go back',
+                  onPressed: _cancelling ? null : _cancel,
+                )
+              : null,
         ),
         bottomNavigationBar: _bottomActions(),
         body: ListView(
