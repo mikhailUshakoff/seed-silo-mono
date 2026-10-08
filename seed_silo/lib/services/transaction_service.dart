@@ -135,6 +135,15 @@ class TransactionService {
         : formattedInteger;
   }
 
+  /// [convert2Decimal] keeps every fractional digit; for display trim the
+  /// trailing zeros (and separators) away, e.g. 1_500.000_000 -> 1_500.
+  String formatAmount(BigInt value, int decimals) {
+    var s = convert2Decimal(value, decimals);
+    if (!s.contains('.')) return s;
+    s = s.replaceFirst(RegExp(r'[0_]+$'), '');
+    return s.endsWith('.') ? s.substring(0, s.length - 1) : s;
+  }
+
   String _formatWithSeparators(String number) {
     final buffer = StringBuffer();
     final length = number.length;

@@ -110,14 +110,12 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
   }
 
   /// [TransferConfirmScreen.amount] is in base units (wei); show it in token
-  /// units with trailing fractional zeros (and separators) trimmed.
+  /// units.
   String get _formattedAmount {
     final value = BigInt.tryParse(widget.amount);
-    if (value == null) return widget.amount;
-    var s = TransactionService().convert2Decimal(value, widget.token.decimals);
-    if (!s.contains('.')) return s;
-    s = s.replaceFirst(RegExp(r'[0_]+$'), '');
-    return s.endsWith('.') ? s.substring(0, s.length - 1) : s;
+    return value == null
+        ? widget.amount
+        : TransactionService().formatAmount(value, widget.token.decimals);
   }
 
   static const _sectionTitleStyle = TextStyle(

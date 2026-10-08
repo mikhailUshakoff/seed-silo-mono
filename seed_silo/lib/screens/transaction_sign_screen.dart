@@ -137,14 +137,8 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     return '0x${digits.length.isOdd ? '0$digits' : digits}';
   }
 
-  /// [TransactionService.convert2Decimal] keeps every fractional digit;
-  /// for display trim the trailing zeros (and separators) away.
-  String _decimal(BigInt value, int decimals) {
-    var s = TransactionService().convert2Decimal(value, decimals);
-    if (!s.contains('.')) return s;
-    s = s.replaceFirst(RegExp(r'[0_]+$'), '');
-    return s.endsWith('.') ? s.substring(0, s.length - 1) : s;
-  }
+  String _decimal(BigInt value, int decimals) =>
+      TransactionService().formatAmount(value, decimals);
 
   String _gwei(EtherAmount? v) =>
       v == null ? '—' : '${_decimal(v.getInWei, 9)} Gwei';
