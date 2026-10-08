@@ -143,6 +143,12 @@ class HardwareWalletService {
 
   // Status codes; must match CORE_* in firmware/include/core/constants.h.
 
+  /// Largest raw transaction the device accepts for signing; must match
+  /// MAX_MSG_LEN in firmware/include/core/command_handlers.h. The device
+  /// only checks it after reading the length prefix, leaving the message
+  /// bytes unread on the port, so oversized messages must never be sent.
+  static const int maxMessageSize = 1024;
+
   /// CORE_SUCCESS.
   static const int successCode = 0x01;
 
@@ -209,6 +215,15 @@ class HardwareWalletService {
   Future<MsgSignature> getSignature(
       Uint8List password, int pos, Uint8List rawTransaction) async {
     _cancelSignatureRequested = false;
+    // The firmware checks the maximum message size and just returns
+    // CORE_ERR_WRONG_DATA_FORMAT. For better UX, check it here before
+    // sending anything to the device.
+    if (rawTransaction.isEmpty || rawTransaction.length > maxMessageSize) {
+      nullifyUint8List(password);
+      throw HardwareWalletException(
+          'Transaction is ${rawTransaction.length} bytes; the device accepts '
+          '1 to $maxMessageSize bytes');
+    }
     final request = [getSignatureCmd];
     request.addAll(password);
     nullifyUint8List(password);
