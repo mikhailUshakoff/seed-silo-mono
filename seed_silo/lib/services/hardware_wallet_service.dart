@@ -69,15 +69,93 @@ class HardwareWalletService {
 
   HardwareWalletService._internal();
 
+  // Command bytes; must match CMD_* in firmware/include/core/constants.h.
+
+  /// CMD_GET_VERSION: replies [versionResponseSize] bytes.
   static const int getVersionCmd = 0x01;
+
+  /// CMD_GET_PUBKEY: replies [publicKeyResponseSize] bytes.
   static const int getUncompressedPublicKeyCmd = 0x02;
+
+  /// CMD_SIGN: replies [signatureSuccessResponseSize] bytes on success,
+  /// [signatureFailedResponseSize] on error or rejection.
   static const int getSignatureCmd = 0x03;
 
+  // Response layout. Every response starts with a status byte; on error the
+  // status byte (an error code) is the whole response.
+
+  /// Status byte at the start of every response.
+  static const int statusCodeSize = 1;
+
+  /// Version payload: major, minor, patch, one byte each.
+  static const int versionSize = 3;
+
+  /// Signature payload: r (32 bytes) || s (32 bytes) || v (1 byte).
+  static const int signatureSize = 65;
+
+  /// Size of each of the r and s signature components.
+  static const int signatureComponentSize = 32;
+
+  /// Offsets of r, s and v inside a successful signature response.
+  static const int signatureRPos = statusCodeSize;
+  static const int signatureSPos = signatureRPos + signatureComponentSize;
+  static const int signatureVPos = signatureSPos + signatureComponentSize;
+
+  /// Uncompressed SEC1 public key as written by
+  /// secp256k1_ec_pubkey_serialize: 0x04 prefix || X (32) || Y (32).
+  static const int publicKeySize = 65;
+
+  /// The 0x04 prefix marking a SEC1 uncompressed public key.
+  static const int publicKeyPrefixSize = 1;
+
+  /// Offset of X || Y (the key without its 0x04 prefix) in a public key
+  /// response; that 64-byte form is what Ethereum addresses are hashed from.
+  static const int publicKeyPos = statusCodeSize + publicKeyPrefixSize;
+
+  /// Full successful responses: status byte + payload.
+  static const int versionResponseSize = statusCodeSize + versionSize;
+  static const int publicKeyResponseSize = statusCodeSize + publicKeySize;
+  static const int signatureSuccessResponseSize =
+      statusCodeSize + signatureSize;
+
+  /// Error or rejection response to a sign request: the status byte only.
+  static const int signatureFailedResponseSize = statusCodeSize;
+
+  // Responses to the version request sent by [_interruptSignature]. If the
+  // user pressed a device button just before it arrived, the answer to the
+  // sign request comes first, followed by the version response.
+
+  /// Signature, then version response.
+  static const int signatureSuccessAndVersionResponseSize =
+      signatureSuccessResponseSize + versionResponseSize;
+
+  /// Rejection, then version response.
+  static const int signatureFailedAndVersionResponseSize =
+      signatureFailedResponseSize + versionResponseSize;
+
+  /// Offset of the version response's status byte in each of the replies
+  /// above.
+  static const int statusInVersionResponsePos = 0;
+  static const int statusInSignatureSuccessAndVersionResponsePos =
+      signatureSuccessResponseSize;
+  static const int statusInSignatureFailedAndVersionResponsePos =
+      signatureFailedResponseSize;
+
+  // Status codes; must match CORE_* in firmware/include/core/constants.h.
+
+  /// CORE_SUCCESS.
   static const int successCode = 0x01;
+
+  /// CORE_ERR_TX_REJECTED: the user rejected the transaction on the device.
   static const int txRejectedCode = 0x0d;
 
+  /// Delay between polls of the serial port.
   static const Duration readTimeout = Duration(milliseconds: 500);
+
+  /// How long to wait for the device to answer a version request.
   static const Duration versionTimeout = Duration(seconds: 5);
+
+  /// How long to wait for the device to answer a public key request.
   static const Duration publicKeyTimeout = Duration(seconds: 5);
 
   bool _cancelSignatureRequested = false;
@@ -94,12 +172,12 @@ class HardwareWalletService {
         if (stopwatch.elapsed >= versionTimeout) return null;
         await Future.delayed(readTimeout);
         // null: port is not open and can not be reopened.
-        buffer = await SerialService().read(1);
+        buffer = await SerialService().read(statusCodeSize);
         if (buffer == null) return null;
       }
-      if (buffer.length == 1 && buffer[0] == successCode) {
-        buffer = await SerialService().read(3);
-        if (buffer != null && buffer.length == 3) {
+      if (buffer.length == statusCodeSize && buffer[0] == successCode) {
+        buffer = await SerialService().read(versionSize);
+        if (buffer != null && buffer.length == versionSize) {
           return Version(buffer[0], buffer[1], buffer[2]);
         }
       }
@@ -124,10 +202,10 @@ class HardwareWalletService {
     return bytes.buffer.asUint8List();
   }
 
-/// Requests a transaction signature from the device. Display-capable devices
-/// wait for user approval; devices without confirmation UI may respond
-/// immediately. Throws [HardwareWalletException] on transport/device errors,
-/// or [HardwareWalletCancelledException] after [cancelSignature].
+  /// Requests a transaction signature from the device. Display-capable devices
+  /// wait for user approval; devices without confirmation UI may respond
+  /// immediately. Throws [HardwareWalletException] on transport/device errors,
+  /// or [HardwareWalletCancelledException] after [cancelSignature].
   Future<MsgSignature> getSignature(
       Uint8List password, int pos, Uint8List rawTransaction) async {
     _cancelSignatureRequested = false;
@@ -148,7 +226,7 @@ class HardwareWalletService {
     try {
       while (buffer!.isEmpty) {
         await Future.delayed(readTimeout);
-        buffer = await SerialService().read(66);
+        buffer = await SerialService().read(signatureSuccessResponseSize);
         // null: port is not open and can not be reopened.
         if (buffer == null) {
           throw HardwareWalletException('Lost connection to the device');
@@ -172,14 +250,14 @@ class HardwareWalletService {
     if (buffer[0] != successCode) {
       throw HardwareWalletException.fromCode(buffer[0]);
     }
-    if (buffer.length != 66) {
+    if (buffer.length != signatureSuccessResponseSize) {
       throw HardwareWalletException('Unexpected device response');
     }
 
     // signature
-    final r = buffer.sublist(1, 33);
-    final s = buffer.sublist(33, 65);
-    final v = buffer[65];
+    final r = buffer.sublist(signatureRPos, signatureSPos);
+    final s = buffer.sublist(signatureSPos, signatureVPos);
+    final v = buffer[signatureVPos];
 
     final sig = MsgSignature(BigInt.parse(bytesToHex(r), radix: 16),
         BigInt.parse(bytesToHex(s), radix: 16), v);
@@ -207,7 +285,8 @@ class HardwareWalletService {
       final stopwatch = Stopwatch()..start();
       while (stopwatch.elapsed < versionTimeout) {
         await Future.delayed(readTimeout);
-        final chunk = await SerialService().read(70);
+        final chunk =
+            await SerialService().read(signatureSuccessAndVersionResponseSize);
         if (chunk == null) return false;
         // Stop once the device has said something and then gone quiet.
         if (chunk.isEmpty && response.isNotEmpty) break;
@@ -221,9 +300,12 @@ class HardwareWalletService {
     }
 
     final versionAt = switch (response.length) {
-      4 => 0,
-      5 when response[0] == txRejectedCode => 1,
-      70 when response[0] == successCode => 66,
+      versionResponseSize => statusInVersionResponsePos,
+      signatureFailedAndVersionResponseSize
+          when response[0] == txRejectedCode =>
+        statusInSignatureFailedAndVersionResponsePos,
+      signatureSuccessAndVersionResponseSize when response[0] == successCode =>
+        statusInSignatureSuccessAndVersionResponsePos,
       _ => -1,
     };
     return versionAt >= 0 && response[versionAt] == successCode;
@@ -258,7 +340,7 @@ class HardwareWalletService {
           throw HardwareWalletException('Device did not respond');
         }
         await Future.delayed(readTimeout);
-        buffer = await SerialService().read(66);
+        buffer = await SerialService().read(publicKeyResponseSize);
         // null: port is not open and can not be reopened.
         if (buffer == null) {
           throw HardwareWalletException('Lost connection to the device');
@@ -276,11 +358,11 @@ class HardwareWalletService {
     if (buffer[0] != successCode) {
       throw HardwareWalletException.fromCode(buffer[0]);
     }
-    if (buffer.length != 66) {
+    if (buffer.length != publicKeyResponseSize) {
       throw HardwareWalletException('Unexpected device response');
     }
 
-    return buffer.sublist(2);
+    return buffer.sublist(publicKeyPos);
   }
 
   void dispose() {

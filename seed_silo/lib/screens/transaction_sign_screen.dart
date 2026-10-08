@@ -13,7 +13,7 @@ import 'package:web3dart/web3dart.dart';
 enum _SignStatus { waiting, sent, rejected, failed }
 
 /// Firmware code for "Transaction was rejected by user" (CORE_ERR_TX_REJECTED).
-const int _txRejectedCode = 0x0d;
+const int _txRejectedCode = HardwareWalletService.txRejectedCode;
 const String _erc20TransferSelector = 'a9059cbb';
 
 /// Shows the built transaction and requests its signature from the device.
