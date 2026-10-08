@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/screens/transaction_sign_screen.dart';
+import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
@@ -63,12 +64,14 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     final passwordPos = int.parse(_passwordPosController.text);
 
     // Get wallet address
-    final walletAddress = await TransactionService().getAddress(
-      Uint8List.fromList(_passwordController.text.codeUnits),
-      passwordPos,
-    );
-    if (walletAddress == null) {
-      _showError('Can not receive wallet address');
+    final String walletAddress;
+    try {
+      walletAddress = await TransactionService().getAddress(
+        Uint8List.fromList(_passwordController.text.codeUnits),
+        passwordPos,
+      );
+    } on HardwareWalletException catch (e) {
+      _showError('Can not receive wallet address: $e');
       return;
     }
 

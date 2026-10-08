@@ -187,15 +187,14 @@ class TransactionService {
     return sendTxHash;
   }
 
-  Future<String?> getAddress(Uint8List textPassword, int posPassword) async {
+  /// Throws [HardwareWalletException] if the device fails or does not answer.
+  Future<String> getAddress(Uint8List textPassword, int posPassword) async {
     final password = keccak256(textPassword);
     nullifyUint8List(textPassword);
     final publicKey = await HardwareWalletService()
         .getUncompressedPublicKey(password, posPassword);
 
-    return publicKey == null
-        ? null
-        : getEthereumAddressFromPublicKey(publicKey);
+    return getEthereumAddressFromPublicKey(publicKey);
   }
 
   Future<BigInt> getBalance(String wallet, String token, String rpcUrl) async {

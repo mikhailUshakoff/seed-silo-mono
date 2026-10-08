@@ -56,9 +56,8 @@ class HardwareWalletException implements Exception {
 /// false when the device did not answer the interrupting request in time, so
 /// its state is unknown.
 class HardwareWalletCancelledException extends HardwareWalletException {
-  final bool deviceResponded;
 
-  HardwareWalletCancelledException({this.deviceResponded = true})
+  HardwareWalletCancelledException()
       : super('Signing cancelled');
 }
 
@@ -77,6 +76,7 @@ class HardwareWalletService {
 
   static const Duration readTimeout = Duration(milliseconds: 500);
   static const Duration versionTimeout = Duration(seconds: 5);
+  static const Duration publicKeyTimeout = Duration(seconds: 5);
 
   bool _cancelSignatureRequested = false;
 
@@ -149,9 +149,8 @@ class HardwareWalletService {
         // Any new command makes the device drop the pending signature, so a
         // version request interrupts its confirmation screen. getVersion()
         // also consumes the reply and closes the port.
-        final version = await getVersion();
-        throw HardwareWalletCancelledException(
-            deviceResponded: version != null);
+        await getVersion();
+        throw HardwareWalletCancelledException();
       }
     }
 
@@ -182,7 +181,9 @@ class HardwareWalletService {
     _cancelSignatureRequested = true;
   }
 
-  Future<Uint8List?> getUncompressedPublicKey(
+  /// Throws [HardwareWalletException] on transport/device errors, or if the
+  /// device does not answer within [publicKeyTimeout].
+  Future<Uint8List> getUncompressedPublicKey(
       Uint8List password, int pos) async {
     final request = [getUncompressedPublicKeyCmd];
     request.addAll(password);
@@ -190,21 +191,37 @@ class HardwareWalletService {
     request.addAll(_intToUint8(pos));
     final ok = await SerialService().write(request);
     nullifyListInt(request);
-    if (ok == null) return null;
+    if (ok == null) {
+      throw HardwareWalletException('Can not connect to the device');
+    }
 
     Uint8List? buffer;
-    while (buffer == null || buffer.isEmpty) {
-      await Future.delayed(readTimeout);
-      buffer = await SerialService().read(66);
+    try {
+      final stopwatch = Stopwatch()..start();
+      while (buffer == null || buffer.isEmpty) {
+        if (stopwatch.elapsed >= publicKeyTimeout) {
+          throw HardwareWalletException('Device did not respond');
+        }
+        await Future.delayed(readTimeout);
+        buffer = await SerialService().read(66);
+      }
+    } on HardwareWalletException {
+      rethrow;
+    } catch (_) {
+      // Port vanished mid-read (e.g. device unplugged).
+      throw HardwareWalletException('Lost connection to the device');
+    } finally {
+      SerialService().close();
     }
 
-    SerialService().close();
-
-    if (buffer.length == 66 && buffer[0] == successCode) {
-      return buffer.sublist(2);
+    if (buffer[0] != successCode) {
+      throw HardwareWalletException.fromCode(buffer[0]);
+    }
+    if (buffer.length != 66) {
+      throw HardwareWalletException('Unexpected device response');
     }
 
-    return null;
+    return buffer.sublist(2);
   }
 
   void dispose() {
