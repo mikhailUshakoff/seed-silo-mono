@@ -161,8 +161,11 @@ class TransactionService {
   /// Signs [tx] on the device and broadcasts it. Returns the tx hash.
   /// Throws [HardwareWalletException] if the device fails or the user
   /// rejects the transaction, or the RPC error if broadcasting fails.
+  /// [onSigned] is called once the device has signed, right before the
+  /// broadcast starts.
   Future<String> sendTransaction(Uint8List textPassword, int posPassword,
-      String rpcUrl, Transaction tx, int chainId) async {
+      String rpcUrl, Transaction tx, int chainId,
+      {void Function()? onSigned}) async {
     if (!tx.isEIP1559) {
       nullifyUint8List(textPassword);
       throw ArgumentError('Only EIP-1559 transactions are supported');
@@ -174,6 +177,7 @@ class TransactionService {
     final rawTransaction = tx.getUnsignedSerialized(chainId: chainId);
     final sig = await HardwareWalletService()
         .getSignature(password, posPassword, rawTransaction);
+    onSigned?.call();
 
     final signedTransaction = _encodeEIP1559ToRlp(tx, sig, chainId);
     final signedRlp = encode(signedTransaction); //rlp
