@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:seed_silo/screens/preload_screen.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/theme/app_theme.dart';
@@ -9,10 +10,10 @@ import 'package:seed_silo/utils/nullify.dart';
 import 'package:wallet/wallet.dart' show EtherAmount;
 import 'package:web3dart/web3dart.dart';
 
-enum _SignStatus { waiting, sent, rejected, failed }
+enum _SignStatus { waiting, broadcasting, sent, rejected, failed }
 
 /// Firmware code for "Transaction was rejected by user" (CORE_ERR_TX_REJECTED).
-const int _txRejectedCode = 0x0d;
+const int _txRejectedCode = HardwareWalletService.txRejectedCode;
 const String _erc20TransferSelector = 'a9059cbb';
 
 /// Shows the built transaction and requests its signature from the device.
@@ -45,6 +46,7 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
   _SignStatus _status = _SignStatus.waiting;
   String? _txHash;
   String? _error;
+  bool _cancelling = false;
 
   late final AnimationController _pulse = AnimationController(
     vsync: this,
@@ -73,8 +75,24 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
         widget.network.rpcUrl,
         widget.transaction,
         widget.network.chainId,
+        // Once signed there is nothing left to cancel on the device, and the
+        // broadcast can not be called back.
+        onSigned: () {
+          if (mounted) setState(() => _status = _SignStatus.broadcasting);
+        },
       );
       _finish(_SignStatus.sent, txHash: txHash);
+    } on HardwareWalletCancelledException catch (e) {
+      if (!mounted) return;
+      if (e.deviceResponded) {
+        Navigator.of(context).pop();
+      } else {
+        // Device did not confirm the interrupt; reconnect from preload screen.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PreloadScreen()),
+          (_) => false,
+        );
+      }
     } on HardwareWalletException catch (e) {
       _finish(
         e.code == _txRejectedCode ? _SignStatus.rejected : _SignStatus.failed,
@@ -83,6 +101,14 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     } catch (e) {
       _finish(_SignStatus.failed, error: 'Failed to send transaction: $e');
     }
+  }
+
+  /// Asks the device to drop the pending request; the screen pops once the
+  /// device has been interrupted (see [_sign]).
+  void _cancel() {
+    if (_cancelling || _status != _SignStatus.waiting) return;
+    setState(() => _cancelling = true);
+    HardwareWalletService().cancelSignature();
   }
 
   void _finish(_SignStatus status, {String? txHash, String? error}) {
@@ -116,14 +142,8 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     return '0x${digits.length.isOdd ? '0$digits' : digits}';
   }
 
-  /// [TransactionService.convert2Decimal] keeps every fractional digit;
-  /// for display trim the trailing zeros (and separators) away.
-  String _decimal(BigInt value, int decimals) {
-    var s = TransactionService().convert2Decimal(value, decimals);
-    if (!s.contains('.')) return s;
-    s = s.replaceFirst(RegExp(r'[0_]+$'), '');
-    return s.endsWith('.') ? s.substring(0, s.length - 1) : s;
-  }
+  String _decimal(BigInt value, int decimals) =>
+      TransactionService().formatAmount(value, decimals);
 
   String _gwei(EtherAmount? v) =>
       v == null ? '—' : '${_decimal(v.getInWei, 9)} Gwei';
@@ -253,6 +273,12 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
           'Check every value below against your Seed Silo screen, '
               'then approve or reject with the device buttons.',
         ),
+      _SignStatus.broadcasting => (
+          BrandColors.pending,
+          Icons.cloud_upload_outlined,
+          'Broadcasting',
+          'Signed on your device. Sending it to ${widget.network.name}…',
+        ),
       _SignStatus.sent => (
           BrandColors.verified,
           Icons.check,
@@ -273,7 +299,8 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
         ),
     };
 
-    final animate = _status == _SignStatus.waiting &&
+    final animate = (_status == _SignStatus.waiting ||
+            _status == _SignStatus.broadcasting) &&
         !MediaQuery.of(context).disableAnimations;
 
     return Semantics(
@@ -485,6 +512,38 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     final Widget child;
     switch (_status) {
       case _SignStatus.waiting:
+        child = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: BrandColors.pending),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                    _cancelling
+                        ? 'Cancelling on device…'
+                        : 'Waiting for device — keep it connected',
+                    style: const TextStyle(
+                        fontSize: 13, color: BrandColors.tan)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52)),
+              onPressed: _cancelling ? null : _cancel,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Back'),
+            ),
+          ],
+        );
+      case _SignStatus.broadcasting:
         child = const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -495,7 +554,7 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
                   strokeWidth: 2, color: BrandColors.pending),
             ),
             SizedBox(width: 10),
-            Text('Waiting for device — keep it connected',
+            Text('Broadcasting — keep the app open',
                 style: TextStyle(fontSize: 13, color: BrandColors.tan)),
           ],
         );
@@ -530,15 +589,29 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
   Widget build(BuildContext context) {
     final transfer = _decodeTransfer();
     final waiting = _status == _SignStatus.waiting;
+    final broadcasting = _status == _SignStatus.broadcasting;
 
     return PopScope(
-      // The device is still waiting for the user; leaving now would orphan
-      // the pending signing request on the serial port.
-      canPop: !waiting,
+      // While the device is waiting for the user, leaving now would orphan
+      // the pending signing request on the serial port, so a back gesture
+      // cancels it on the device first and the screen pops afterwards.
+      // While broadcasting there is nothing to cancel; stay until the
+      // result is known.
+      canPop: !waiting && !broadcasting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _cancel();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Sign Transaction'),
-          automaticallyImplyLeading: !waiting,
+          automaticallyImplyLeading: !broadcasting,
+          leading: waiting
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Cancel and go back',
+                  onPressed: _cancelling ? null : _cancel,
+                )
+              : null,
         ),
         bottomNavigationBar: _bottomActions(),
         body: ListView(

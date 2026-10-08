@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/screens/transaction_sign_screen.dart';
+import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
@@ -63,12 +64,14 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     final passwordPos = int.parse(_passwordPosController.text);
 
     // Get wallet address
-    final walletAddress = await TransactionService().getAddress(
-      Uint8List.fromList(_passwordController.text.codeUnits),
-      passwordPos,
-    );
-    if (walletAddress == null) {
-      _showError('Can not receive wallet address');
+    final String walletAddress;
+    try {
+      walletAddress = await TransactionService().getAddress(
+        Uint8List.fromList(_passwordController.text.codeUnits),
+        passwordPos,
+      );
+    } on HardwareWalletException catch (e) {
+      _showError('Can not receive wallet address: $e');
       return;
     }
 
@@ -109,15 +112,31 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
     );
   }
 
+  /// [TransferConfirmScreen.amount] is in base units (wei); show it in token
+  /// units.
+  String get _formattedAmount {
+    final value = BigInt.tryParse(widget.amount);
+    return value == null
+        ? widget.amount
+        : TransactionService().formatAmount(value, widget.token.decimals);
+  }
+
+  static const _sectionTitleStyle = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 1.0,
+    color: BrandColors.tan,
+  );
+
   Widget _summaryRow({
     required IconData icon,
     required String label,
     required Widget value,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
             width: 32,
@@ -157,58 +176,82 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
             Card(
               margin: EdgeInsets.zero,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text('YOU ARE SENDING', style: _sectionTitleStyle),
+                    const SizedBox(height: 6),
+                    Text.rich(
+                      TextSpan(children: [
+                        TextSpan(
+                          text: _formattedAmount,
+                          style: const TextStyle(
+                              fontSize: 30, fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(
+                          text: '  ${widget.token.symbol}',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: BrandColors.tan),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(height: 1),
                     _summaryRow(
-                      icon: Icons.hub,
-                      label: 'Network',
-                      value: Text(
-                        '${widget.network.name} · Chain ID ${widget.network.chainId}',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w500),
+                      icon: Icons.arrow_outward,
+                      label: 'To',
+                      value: SelectableText(
+                        widget.destination,
+                        style: BrandColors.mono
+                            .copyWith(fontSize: 13, color: BrandColors.cream),
                       ),
                     ),
                     const Divider(height: 1),
                     _summaryRow(
                       icon: Icons.token,
                       label: 'Token',
-                      value: Text(
-                        '${widget.token.symbol} · ${widget.token.decimals} dec · ${widget.token.address}',
-                        style: BrandColors.mono
-                            .copyWith(fontSize: 12, color: BrandColors.tan),
+                      value: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                            text: widget.token.symbol,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: BrandColors.cream),
+                          ),
+                          TextSpan(
+                            text: '  ·  ${widget.token.decimals} decimals'
+                                '  ·  ${widget.token.address}',
+                            style: BrandColors.mono
+                                .copyWith(fontSize: 11, color: BrandColors.tan),
+                          ),
+                        ]),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const Divider(height: 1),
                     _summaryRow(
-                      icon: Icons.arrow_upward,
-                      label: 'Amount',
-                      value: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${widget.amount} ${widget.token.symbol}',
+                      icon: Icons.hub,
+                      label: 'Network',
+                      value: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                            text: widget.network.name,
                             style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w700),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: BrandColors.cream),
                           ),
-                          const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('to  ',
-                                  style: TextStyle(
-                                      fontSize: 12, color: BrandColors.tan)),
-                              Expanded(
-                                child: SelectableText(
-                                  widget.destination,
-                                  style: BrandColors.mono.copyWith(
-                                      fontSize: 12, color: BrandColors.tan),
-                                ),
-                              ),
-                            ],
+                          TextSpan(
+                            text: '  ·  Chain ID ${widget.network.chainId}',
+                            style: const TextStyle(
+                                fontSize: 12, color: BrandColors.tan),
                           ),
-                        ],
+                        ]),
                       ),
                     ),
                   ],
@@ -226,6 +269,7 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
                 child: Form(
                   key: _formKey,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       TextFormField(
                         controller: _passwordController,
