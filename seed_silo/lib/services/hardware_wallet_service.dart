@@ -56,8 +56,9 @@ class HardwareWalletException implements Exception {
 /// false when the device did not answer the interrupting request in time, so
 /// its state is unknown.
 class HardwareWalletCancelledException extends HardwareWalletException {
+  final bool deviceResponded;
 
-  HardwareWalletCancelledException()
+  HardwareWalletCancelledException({this.deviceResponded = true})
       : super('Signing cancelled');
 }
 
@@ -73,6 +74,7 @@ class HardwareWalletService {
   static const int getSignatureCmd = 0x03;
 
   static const int successCode = 0x01;
+  static const int txRejectedCode = 0x0d;
 
   static const Duration readTimeout = Duration(milliseconds: 500);
   static const Duration versionTimeout = Duration(seconds: 5);
@@ -153,11 +155,8 @@ class HardwareWalletService {
         }
         if (buffer.isEmpty && _cancelSignatureRequested) {
           _cancelSignatureRequested = false;
-          // Any new command makes the device drop the pending signature, so
-          // a version request interrupts its confirmation screen. getVersion()
-          // also consumes the reply and closes the port.
-          await getVersion();
-          throw HardwareWalletCancelledException();
+          throw HardwareWalletCancelledException(
+              deviceResponded: await _interruptSignature());
         }
       }
     } on HardwareWalletException {
@@ -185,6 +184,49 @@ class HardwareWalletService {
     final sig = MsgSignature(BigInt.parse(bytesToHex(r), radix: 16),
         BigInt.parse(bytesToHex(s), radix: 16), v);
     return sig;
+  }
+
+  /// Sends a version request to drop the signature pending on the device and
+  /// drains the reply. Returns false if the device did not answer as
+  /// expected, so its state is unknown.
+  ///
+  /// Any new command makes the device leave its confirmation screen. But the
+  /// device checks its buttons before the serial port, so if the user pressed
+  /// one just before the request arrived, that answer is sent first:
+  ///   version reply only:           01 maj min patch
+  ///   rejected, then version:       0d 01 maj min patch
+  ///   signed, then version:         01 [r s v: 65 bytes] 01 maj min patch
+  /// All three count as cancelled; a signature received here is discarded,
+  /// so nothing gets broadcast.
+  Future<bool> _interruptSignature() async {
+    final ok = await SerialService().write([getVersionCmd]);
+    if (ok == null) return false;
+
+    final response = <int>[];
+    try {
+      final stopwatch = Stopwatch()..start();
+      while (stopwatch.elapsed < versionTimeout) {
+        await Future.delayed(readTimeout);
+        final chunk = await SerialService().read(70);
+        if (chunk == null) return false;
+        // Stop once the device has said something and then gone quiet.
+        if (chunk.isEmpty && response.isNotEmpty) break;
+        response.addAll(chunk);
+      }
+    } catch (_) {
+      // Port vanished mid-read (e.g. device unplugged).
+      return false;
+    } finally {
+      SerialService().close();
+    }
+
+    final versionAt = switch (response.length) {
+      4 => 0,
+      5 when response[0] == txRejectedCode => 1,
+      70 when response[0] == successCode => 66,
+      _ => -1,
+    };
+    return versionAt >= 0 && response[versionAt] == successCode;
   }
 
   /// Interrupts a [getSignature] call that is waiting for user confirmation
