@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/models/token.dart';
+import 'package:seed_silo/screens/preload_screen.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/theme/app_theme.dart';
@@ -76,8 +77,17 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
         widget.network.chainId,
       );
       _finish(_SignStatus.sent, txHash: txHash);
-    } on HardwareWalletCancelledException {
-      if (mounted) Navigator.of(context).pop();
+    } on HardwareWalletCancelledException catch (e) {
+      if (!mounted) return;
+      if (e.deviceResponded) {
+        Navigator.of(context).pop();
+      } else {
+        // Device did not confirm the interrupt; reconnect from preload screen.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PreloadScreen()),
+          (_) => false,
+        );
+      }
     } on HardwareWalletException catch (e) {
       _finish(
         e.code == _txRejectedCode ? _SignStatus.rejected : _SignStatus.failed,

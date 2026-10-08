@@ -52,9 +52,14 @@ class HardwareWalletException implements Exception {
 }
 
 /// Thrown by [HardwareWalletService.getSignature] when the pending request was
-/// cancelled via [HardwareWalletService.cancelSignature].
+/// cancelled via [HardwareWalletService.cancelSignature]. [deviceResponded] is
+/// false when the device did not answer the interrupting request in time, so
+/// its state is unknown.
 class HardwareWalletCancelledException extends HardwareWalletException {
-  HardwareWalletCancelledException() : super('Signing cancelled');
+  final bool deviceResponded;
+
+  HardwareWalletCancelledException({this.deviceResponded = true})
+      : super('Signing cancelled');
 }
 
 class HardwareWalletService {
@@ -71,25 +76,36 @@ class HardwareWalletService {
   static const int successCode = 0x01;
 
   static const Duration readTimeout = Duration(milliseconds: 500);
+  static const Duration versionTimeout = Duration(seconds: 5);
 
   bool _cancelSignatureRequested = false;
 
+  /// Returns null if the device can not be reached or does not answer within
+  /// [versionTimeout].
   Future<Version?> getVersion() async {
     final ok = await SerialService().write([getVersionCmd]);
     if (ok == null) return null;
-    Uint8List? buffer;
-    while (buffer == null || buffer.isEmpty) {
-      await Future.delayed(readTimeout);
-      buffer = await SerialService().read(1);
-    }
-    if (buffer.length == 1 && buffer[0] == successCode) {
-      buffer = await SerialService().read(3);
-      SerialService().close();
-      if (buffer != null && buffer.length == 3) {
-        return Version(buffer[0], buffer[1], buffer[2]);
+    try {
+      final stopwatch = Stopwatch()..start();
+      Uint8List? buffer;
+      while (buffer == null || buffer.isEmpty) {
+        if (stopwatch.elapsed >= versionTimeout) return null;
+        await Future.delayed(readTimeout);
+        buffer = await SerialService().read(1);
       }
+      if (buffer.length == 1 && buffer[0] == successCode) {
+        buffer = await SerialService().read(3);
+        if (buffer != null && buffer.length == 3) {
+          return Version(buffer[0], buffer[1], buffer[2]);
+        }
+      }
+      return null;
+    } catch (_) {
+      // Port vanished mid-read (e.g. device unplugged).
+      return null;
+    } finally {
+      SerialService().close();
     }
-    return null;
   }
 
   Uint8List _intToUint16(int value) {
@@ -133,8 +149,9 @@ class HardwareWalletService {
         // Any new command makes the device drop the pending signature, so a
         // version request interrupts its confirmation screen. getVersion()
         // also consumes the reply and closes the port.
-        await getVersion();
-        throw HardwareWalletCancelledException();
+        final version = await getVersion();
+        throw HardwareWalletCancelledException(
+            deviceResponded: version != null);
       }
     }
 
