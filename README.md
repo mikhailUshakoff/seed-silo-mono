@@ -12,7 +12,7 @@ Hardware crypto wallet built on ESP32. Stores an encrypted keys and signs transa
 | [`seed_silo/`](seed_silo/) | Flutter desktop/mobile app - the user-facing wallet UI, talks to the device over serial. |
 | [`utils/`](utils/) | Standalone Rust CLIs for provisioning/dev (key generation, seed encryption, signature verification). Not shipped to the device. |
 
-Tested networks: Arbitrum, Base, Ethereum, Linea, Optimism, Scroll, Taiko, zkSync (any EVM chain supporting EIP-1559).
+**Tested networks**: Arbitrum, Base, BNB, **Ethereum**, Linea, Optimism, Scroll, Taiko, zkSync (any EVM chain supporting EIP-1559).
 
 ## Boards
 
