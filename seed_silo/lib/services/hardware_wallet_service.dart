@@ -87,11 +87,13 @@ class HardwareWalletService {
     if (ok == null) return null;
     try {
       final stopwatch = Stopwatch()..start();
-      Uint8List? buffer;
-      while (buffer == null || buffer.isEmpty) {
+      Uint8List? buffer = Uint8List(0);
+      while (buffer!.isEmpty) {
         if (stopwatch.elapsed >= versionTimeout) return null;
         await Future.delayed(readTimeout);
+        // null: port is not open and can not be reopened.
         buffer = await SerialService().read(1);
+        if (buffer == null) return null;
       }
       if (buffer.length == 1 && buffer[0] == successCode) {
         buffer = await SerialService().read(3);
@@ -140,22 +142,33 @@ class HardwareWalletService {
       throw HardwareWalletException('Can not connect to the device');
     }
 
-    Uint8List? buffer;
-    while (buffer == null || buffer.isEmpty) {
-      await Future.delayed(readTimeout);
-      buffer = await SerialService().read(66);
-      if ((buffer == null || buffer.isEmpty) && _cancelSignatureRequested) {
-        _cancelSignatureRequested = false;
-        // Any new command makes the device drop the pending signature, so a
-        // version request interrupts its confirmation screen. getVersion()
-        // also consumes the reply and closes the port.
-        await getVersion();
-        throw HardwareWalletCancelledException();
+    Uint8List? buffer = Uint8List(0);
+    try {
+      while (buffer!.isEmpty) {
+        await Future.delayed(readTimeout);
+        buffer = await SerialService().read(66);
+        // null: port is not open and can not be reopened.
+        if (buffer == null) {
+          throw HardwareWalletException('Lost connection to the device');
+        }
+        if (buffer.isEmpty && _cancelSignatureRequested) {
+          _cancelSignatureRequested = false;
+          // Any new command makes the device drop the pending signature, so
+          // a version request interrupts its confirmation screen. getVersion()
+          // also consumes the reply and closes the port.
+          await getVersion();
+          throw HardwareWalletCancelledException();
+        }
       }
+    } on HardwareWalletException {
+      rethrow;
+    } catch (_) {
+      // Port vanished mid-read (e.g. device unplugged).
+      throw HardwareWalletException('Lost connection to the device');
+    } finally {
+      _cancelSignatureRequested = false;
+      SerialService().close();
     }
-
-    _cancelSignatureRequested = false;
-    SerialService().close();
 
     if (buffer[0] != successCode) {
       throw HardwareWalletException.fromCode(buffer[0]);
@@ -195,15 +208,19 @@ class HardwareWalletService {
       throw HardwareWalletException('Can not connect to the device');
     }
 
-    Uint8List? buffer;
+    Uint8List? buffer = Uint8List(0);
     try {
       final stopwatch = Stopwatch()..start();
-      while (buffer == null || buffer.isEmpty) {
+      while (buffer!.isEmpty) {
         if (stopwatch.elapsed >= publicKeyTimeout) {
           throw HardwareWalletException('Device did not respond');
         }
         await Future.delayed(readTimeout);
         buffer = await SerialService().read(66);
+        // null: port is not open and can not be reopened.
+        if (buffer == null) {
+          throw HardwareWalletException('Lost connection to the device');
+        }
       }
     } on HardwareWalletException {
       rethrow;
