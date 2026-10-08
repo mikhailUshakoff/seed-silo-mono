@@ -156,7 +156,7 @@ class HardwareWalletService {
   static const int txRejectedCode = 0x0d;
 
   /// Delay between polls of the serial port.
-  static const Duration readTimeout = Duration(milliseconds: 500);
+  static const Duration readTimeout = Duration(seconds: 1);
 
   /// How long to wait for the device to answer a version request.
   static const Duration versionTimeout = Duration(seconds: 5);
