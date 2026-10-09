@@ -512,35 +512,21 @@ class _TransactionSignScreenState extends State<TransactionSignScreen>
     final Widget child;
     switch (_status) {
       case _SignStatus.waiting:
-        child = Column(
-          mainAxisSize: MainAxisSize.min,
+        child = Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: BrandColors.pending),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                    _cancelling
-                        ? 'Cancelling on device…'
-                        : 'Waiting for device — keep it connected',
-                    style: const TextStyle(
-                        fontSize: 13, color: BrandColors.tan)),
-              ],
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: BrandColors.pending),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52)),
-              onPressed: _cancelling ? null : _cancel,
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Back'),
-            ),
+            const SizedBox(width: 10),
+            Text(
+                _cancelling
+                    ? 'Cancelling on device…'
+                    : 'Waiting for device — keep it connected',
+                style: const TextStyle(fontSize: 13, color: BrandColors.tan)),
           ],
         );
       case _SignStatus.broadcasting:
