@@ -89,7 +89,7 @@ trap 'exit 143' TERM
 
 # 1. Build the encryption tool before any secret is in memory.
 echo "Building key-encryption..."
-cargo build --release --quiet --manifest-path "$KEY_ENC_DIR/Cargo.toml"
+env -u PRIVATE_KEYS -u ENCRYPTION_KEY cargo build --release --quiet --manifest-path "$KEY_ENC_DIR/Cargo.toml"
 [[ -x "$KEY_ENC_BIN" ]] || die "key-encryption binary not found at $KEY_ENC_BIN"
 
 # 2. Collect secrets (hidden input, not in shell history or process args).
