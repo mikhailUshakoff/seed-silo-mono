@@ -22,18 +22,25 @@ FIRMWARE_DIR="$REPO_ROOT/firmware"
 KEY_ENC_DIR="$REPO_ROOT/utils/key-encryption"
 KEY_ENC_BIN="$KEY_ENC_DIR/target/release/key-encryption"
 INPUT_H="$FIRMWARE_DIR/include/core/input.h"
+LOCK_DIR="$FIRMWARE_DIR/.pio/flash-firmware.lock"
 
 PIO_ENV="lilygo_tdisplay_s3"
 UPLOAD_PORT=""
 
 usage() {
-    echo "Usage: $0 [-e <pio_env>] [-p <upload_port>]" >&2
+    echo "Usage: $0 [-e lilygo_tdisplay_s3|super_mini_esp32c3] [-p <upload_port>]" >&2
     exit 1
 }
 
 while getopts ":e:p:h" opt; do
     case "$opt" in
-        e) PIO_ENV="$OPTARG" ;;
+        # Whitelist: PIO_ENV is interpolated into an rm -rf path in cleanup().
+        e)
+            case "$OPTARG" in
+                lilygo_tdisplay_s3|super_mini_esp32c3) PIO_ENV="$OPTARG" ;;
+                *) echo "error: unsupported env '$OPTARG'" >&2; usage ;;
+            esac
+            ;;
         p) UPLOAD_PORT="$OPTARG" ;;
         *) usage ;;
     esac
@@ -44,18 +51,14 @@ die() { echo "error: $*" >&2; exit 1; }
 command -v cargo >/dev/null || die "cargo not found"
 command -v pio   >/dev/null || die "pio (PlatformIO) not found"
 
-# Refuse to clobber an existing input.h: it may be the only copy of real data.
-[[ -e "$INPUT_H" ]] && die "$INPUT_H already exists. Move or delete it first."
-
-# input.h must be git-ignored so it can never be committed by accident.
-git -C "$REPO_ROOT" check-ignore -q "$INPUT_H" \
-    || die "$INPUT_H is not git-ignored; refusing to continue"
-
-if [[ "$PIO_ENV" == "super_mini_esp32c3" ]]; then
-    echo "WARNING: $PIO_ENV has no display and signs transactions WITHOUT on-device confirmation." >&2
-fi
+# Serialize runs: input.h and the .pio build dir are shared, so a concurrent
+# run could overwrite our input.h or delete it mid-build. mkdir is atomic.
+mkdir -p "$(dirname "$LOCK_DIR")"
+mkdir "$LOCK_DIR" 2>/dev/null \
+    || die "another flash is in progress ($LOCK_DIR exists). If not, remove it and retry."
 
 TMP_INPUT=""
+OWN_INPUT_H=0   # set once *we* publish input.h; cleanup only removes ours
 
 secure_rm() {
     local f="$1"
@@ -72,20 +75,34 @@ cleanup() {
     trap - EXIT INT TERM
     unset PRIVATE_KEYS ENCRYPTION_KEY ENCRYPTION_KEY_CONFIRM
     secure_rm "$TMP_INPUT"
-    secure_rm "$INPUT_H"
-    # Compiled objects/firmware.bin embed the encrypted seed; drop them too.
-    rm -rf "$FIRMWARE_DIR/.pio/build/$PIO_ENV"
-    if [[ -e "$INPUT_H" ]]; then
-        echo "error: failed to remove $INPUT_H — delete it manually!" >&2
-        rc=1
-    else
-        echo "Cleaned up input.h and build artifacts for $PIO_ENV."
+    if [[ "$OWN_INPUT_H" == 1 ]]; then
+        # Compiled objects/firmware.bin embed the encrypted seed; drop them too.
+        rm -rf "$FIRMWARE_DIR/.pio/build/$PIO_ENV"
+        secure_rm "$INPUT_H"
+        if [[ -e "$INPUT_H" ]]; then
+            echo "error: failed to remove $INPUT_H — delete it manually!" >&2
+            rc=1
+        else
+            echo "Cleaned up input.h and build artifacts for $PIO_ENV."
+        fi
     fi
+    rmdir "$LOCK_DIR" 2>/dev/null || true
     exit "$rc"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+# Refuse to clobber an existing input.h: it may be the only copy of real data.
+[[ -e "$INPUT_H" ]] && die "$INPUT_H already exists. Move or delete it first."
+
+# input.h must be git-ignored so it can never be committed by accident.
+git -C "$REPO_ROOT" check-ignore -q "$INPUT_H" \
+    || die "$INPUT_H is not git-ignored; refusing to continue"
+
+if [[ "$PIO_ENV" == "super_mini_esp32c3" ]]; then
+    echo "WARNING: $PIO_ENV has no display and signs transactions WITHOUT on-device confirmation." >&2
+fi
 
 # 1. Build the encryption tool before any secret is in memory.
 echo "Building key-encryption..."
@@ -119,7 +136,11 @@ unset PRIVATE_KEYS ENCRYPTION_KEY
 
 grep -q '^#define GCM_TAG_INITIALIZER' "$TMP_INPUT" \
     || die "key-encryption output looks invalid"
-mv "$TMP_INPUT" "$INPUT_H"
+# ln is an atomic no-clobber publish (fails if input.h appeared meanwhile).
+# Then plain rm the temp name: shredding it would zero the shared inode.
+ln "$TMP_INPUT" "$INPUT_H" || die "$INPUT_H appeared during run; not overwriting"
+OWN_INPUT_H=1
+rm -f "$TMP_INPUT"
 TMP_INPUT=""
 
 # 4. Build + upload.
