@@ -73,7 +73,11 @@ secure_rm() {
 cleanup() {
     local rc=$?
     local cleanup_failed=0
-    trap - EXIT INT TERM HUP
+    trap - EXIT
+    # Ignore (not reset) signals: a second Ctrl-C must not abort cleanup and
+    # leave input.h behind. No set -e: a failed echo must not skip deletion.
+    trap '' INT TERM HUP
+    set +e
     unset PRIVATE_KEYS ENCRYPTION_KEY ENCRYPTION_KEY_CONFIRM
     # A signal between `ln` and `OWN_INPUT_H=1` leaves both names on one inode
     # with the flag unset. Same inode => input.h is ours, remove it too.
@@ -134,8 +138,8 @@ if [[ -z "${ENCRYPTION_KEY:-}" ]]; then
 fi
 [[ -n "$ENCRYPTION_KEY" ]] || die "ENCRYPTION_KEY is empty"
 
-# 3. Generate input.h. Write to a temp file in the same dir, then rename, so a
-#    partial/failed run never leaves a truncated input.h behind.
+# 3. Generate input.h. Write to a temp file in the same dir, then hard-link it
+#    into place, so a partial/failed run never leaves a truncated input.h behind.
 TMP_INPUT="$(mktemp "$FIRMWARE_DIR/include/core/.input.h.XXXXXX")"
 echo "Encrypting keys..."
 # Secrets go only into the child's environment, never onto its argv.
