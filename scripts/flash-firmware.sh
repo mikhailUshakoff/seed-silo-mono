@@ -72,20 +72,24 @@ secure_rm() {
 
 cleanup() {
     local rc=$?
+    local cleanup_failed=0
     trap - EXIT INT TERM
     unset PRIVATE_KEYS ENCRYPTION_KEY ENCRYPTION_KEY_CONFIRM
-    secure_rm "$TMP_INPUT"
+    secure_rm "$TMP_INPUT" || cleanup_failed=1
     if [[ "$OWN_INPUT_H" == 1 ]]; then
-        # Compiled objects/firmware.bin embed the encrypted seed; drop them too.
-        rm -rf "$FIRMWARE_DIR/.pio/build/$PIO_ENV"
-        secure_rm "$INPUT_H"
+        secure_rm "$INPUT_H" || cleanup_failed=1
+        if ! rm -rf "$FIRMWARE_DIR/.pio/build/$PIO_ENV"; then
+            echo "error: failed to remove build artifacts for $PIO_ENV" >&2
+            cleanup_failed=1
+        fi
         if [[ -e "$INPUT_H" ]]; then
             echo "error: failed to remove $INPUT_H — delete it manually!" >&2
-            rc=1
-        else
+            cleanup_failed=1
+        elif [[ "$cleanup_failed" == 0 ]]; then
             echo "Cleaned up input.h and build artifacts for $PIO_ENV."
         fi
     fi
+    [[ "$cleanup_failed" == 0 ]] || rc=1
     rmdir "$LOCK_DIR" 2>/dev/null || true
     exit "$rc"
 }
