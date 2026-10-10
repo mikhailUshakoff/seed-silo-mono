@@ -117,7 +117,7 @@ env -u PRIVATE_KEYS -u ENCRYPTION_KEY cargo build --release --quiet --manifest-p
 if [[ -z "${PRIVATE_KEYS:-}" ]]; then
     read -r -s -p "PRIVATE_KEYS (<hex>,<pos>;...): " PRIVATE_KEYS; echo
 fi
-[[ -n "$PRIVATE_KEYS" ]] || die "PRIVATE_KEYS is empty"
+[[ "$PRIVATE_KEYS" =~ [^[:space:];] ]] || die "PRIVATE_KEYS contains no key entries"
 
 if [[ -z "${ENCRYPTION_KEY:-}" ]]; then
     read -r -s -p "ENCRYPTION_KEY: " ENCRYPTION_KEY; echo
