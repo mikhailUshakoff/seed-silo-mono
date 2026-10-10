@@ -223,7 +223,7 @@ Saving the counter before decryption prevents power-cut bypasses, but the flash-
 
 #### Notes
 
-- **Flash wear:** about 100k erase cycles per sector is plenty for a counter. To reduce wear further, store the counter as an append-only bit pattern inside one sector (clear one bit per attempt) and erase only on reset.
+- **Flash wear:** Use a wear-leveled or append-only record format designed for encrypted partitions. Do not clear individual plaintext bits in place: AES-XTS changes an entire ciphertext block, and NOR flash cannot generally apply the resulting 0→1 transitions without erasing the sector.
 - **Pick MAX with care**, for example 10. Too low and a typo-prone user wipes their own device.
 - **Recovery** after a wipe means the mnemonic backup plus re-provisioning. Make sure the backup exists before you enable the wipe.
 
