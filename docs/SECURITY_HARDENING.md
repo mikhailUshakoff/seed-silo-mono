@@ -211,6 +211,8 @@ The blob is ciphertext, so it's safe to send over USB. Add a provisioning comman
 
 An attacker can cut power right after a wrong guess, before the counter is saved, and get unlimited tries. So **increment and save first, then try to decrypt**:
 
+Saving the counter before decryption prevents power-cut bypasses, but the flash-backed counter remains rollbackable. AES-XTS flash encryption provides confidentiality rather than freshness or integrity, so an attacker with the physical flash access assumed by this document can restore an earlier ciphertext snapshot at the same sector and bypass both MAX and the wipe. This design needs non-rollbackable state (for example, a monotonic secure-element/eFuse mechanism), or the stated protection must be limited to attackers who cannot restore flash.
+
 ```
 1. counter += 1, write to flash (commit)
 2. if counter > MAX → erase partition, respond error
