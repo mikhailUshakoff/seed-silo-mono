@@ -73,8 +73,13 @@ secure_rm() {
 cleanup() {
     local rc=$?
     local cleanup_failed=0
-    trap - EXIT INT TERM
+    trap - EXIT INT TERM HUP
     unset PRIVATE_KEYS ENCRYPTION_KEY ENCRYPTION_KEY_CONFIRM
+    # A signal between `ln` and `OWN_INPUT_H=1` leaves both names on one inode
+    # with the flag unset. Same inode => input.h is ours, remove it too.
+    if [[ -n "$TMP_INPUT" && "$TMP_INPUT" -ef "$INPUT_H" ]]; then
+        OWN_INPUT_H=1
+    fi
     secure_rm "$TMP_INPUT" || cleanup_failed=1
     if [[ "$OWN_INPUT_H" == 1 ]]; then
         secure_rm "$INPUT_H" || cleanup_failed=1
@@ -96,6 +101,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap 'exit 129' HUP   # terminal closed mid-build must still clean up
 
 # Refuse to clobber an existing input.h: it may be the only copy of real data.
 [[ -e "$INPUT_H" ]] && die "$INPUT_H already exists. Move or delete it first."
@@ -117,7 +123,8 @@ env -u PRIVATE_KEYS -u ENCRYPTION_KEY cargo build --release --quiet --manifest-p
 if [[ -z "${PRIVATE_KEYS:-}" ]]; then
     read -r -s -p "PRIVATE_KEYS (<hex>,<pos>;...): " PRIVATE_KEYS; echo
 fi
-[[ "$PRIVATE_KEYS" =~ [^[:space:];] ]] || die "PRIVATE_KEYS contains no key entries"
+KEY_ENTRY_RE='[^[:space:];]'   # in a var: a bare ';' breaks [[ ]] parsing
+[[ "$PRIVATE_KEYS" =~ $KEY_ENTRY_RE ]] || die "PRIVATE_KEYS contains no key entries"
 
 if [[ -z "${ENCRYPTION_KEY:-}" ]]; then
     read -r -s -p "ENCRYPTION_KEY: " ENCRYPTION_KEY; echo
