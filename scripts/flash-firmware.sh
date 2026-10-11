@@ -20,7 +20,7 @@ ulimit -c 0     # no core dumps containing secrets
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIRMWARE_DIR="$REPO_ROOT/firmware"
 KEY_ENC_DIR="$REPO_ROOT/utils/key-encryption"
-KEY_ENC_BIN="$KEY_ENC_DIR/target/release/key-encryption"
+KEY_ENC_BIN="$REPO_ROOT/utils/target/release/key-encryption"
 INPUT_H="$FIRMWARE_DIR/include/core/input.h"
 LOCK_DIR="$FIRMWARE_DIR/.pio/flash-firmware.lock"
 
