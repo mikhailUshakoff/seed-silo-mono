@@ -205,7 +205,7 @@ esp_partition_erase_range(p, 0, p->size);   // whole partition → 0xFF
 
 #### 4. Provisioning
 
-The blob is ciphertext, so it's safe to send over USB. Add a provisioning command where the firmware receives the blob and writes it to the partition. That works even after flash encryption release mode, where `esptool` can no longer write plaintext.
+The blob is ciphertext, so it need not be confidential over USB, but writes must still be authorized. Add a provisioning command that accepts the blob only while the partition is blank or while the device is in an explicitly authorized physical recovery mode; reject rewrites during normal operation. This works after flash-encryption release mode, where `esptool` can no longer write plaintext.
 
 #### 5. Counter order: save first, then decrypt
 
