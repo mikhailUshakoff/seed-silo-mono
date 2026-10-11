@@ -20,6 +20,33 @@ void handle_get_version_cmd() {
     Serial.write(response, sizeof(response));
 }
 
+static_assert(KDF_ALGORITHM == KDF_ARGON2ID, "input.h: unsupported KDF_ALGORITHM");
+static_assert(KDF_SALT_LEN == 32, "input.h: KDF_SALT_LEN must be 32");
+
+static void write_u32_be(uint8_t* out, uint32_t value) {
+    out[0] = (uint8_t)(value >> 24);
+    out[1] = (uint8_t)(value >> 16);
+    out[2] = (uint8_t)(value >> 8);
+    out[3] = (uint8_t)value;
+}
+
+// Response: status | kdf id | m_cost KiB (u32 BE) | t_cost (u32 BE) |
+// p_cost (u32 BE) | salt (KDF_SALT_LEN). Salt and costs are not secret, so
+// no password is required.
+void handle_get_kdf_params_cmd() {
+    static const uint8_t salt[KDF_SALT_LEN] = KDF_SALT_INITIALIZER;
+
+    uint8_t response[1 + 1 + 3 * 4 + KDF_SALT_LEN];
+    response[0] = CORE_SUCCESS;
+    response[1] = KDF_ALGORITHM;
+    write_u32_be(response + 2, KDF_M_COST_KIB);
+    write_u32_be(response + 6, KDF_T_COST);
+    write_u32_be(response + 10, KDF_P_COST);
+    memcpy(response + 14, salt, KDF_SALT_LEN);
+
+    Serial.write(response, sizeof(response));
+}
+
 void handle_get_pubkey_cmd() {
     uint8_t key[32];
     if (Serial.readBytes(key, sizeof(key)) != sizeof(key)) {

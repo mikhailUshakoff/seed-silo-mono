@@ -4,9 +4,13 @@
     #define CMD_GET_VERSION 0x01
     #define CMD_GET_PUBKEY 0x02
     #define CMD_SIGN 0x03
+    #define CMD_GET_KDF_PARAMS 0x04
+
+    // Password KDF identifiers (KDF_ALGORITHM in input.h)
+    #define KDF_ARGON2ID 0x01 // Argon2id v1.3 (0x13), 32-byte output
 
     #define VERSION_MAJOR 0x00
-    #define VERSION_MINOR 0x01
+    #define VERSION_MINOR 0x02
     #define VERSION_PATCH 0x00
 
     // Universal error codes for crypto operations

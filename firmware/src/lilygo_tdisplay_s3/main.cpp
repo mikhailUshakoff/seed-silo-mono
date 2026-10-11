@@ -101,6 +101,12 @@ void loop() { //...............................................................l
                     handle_get_pubkey_cmd();
                     break;
                 }
+                case CMD_GET_KDF_PARAMS:
+                {
+                    tft.drawString("CMD: get KDF params",10,10);
+                    handle_get_kdf_params_cmd();
+                    break;
+                }
                 case CMD_SIGN:
                 {
                     tft.drawString("CMD: sign",5,5);
