@@ -22,6 +22,11 @@ void loop() {
                     handle_get_pubkey_cmd();
                     break;
                 }
+                case CMD_GET_KDF_PARAMS:
+                {
+                    handle_get_kdf_params_cmd();
+                    break;
+                }
                 case CMD_SIGN:
                 {
                     uint8_t signature[64] = {0};

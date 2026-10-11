@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:seed_silo/services/kdf_service.dart';
 import 'package:seed_silo/services/serial_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:web3dart/web3dart.dart';
@@ -81,6 +82,9 @@ class HardwareWalletService {
   /// [signatureFailedResponseSize] on error or rejection.
   static const int getSignatureCmd = 0x03;
 
+  /// CMD_GET_KDF_PARAMS: replies [kdfParamsResponseSize] bytes.
+  static const int getKdfParamsCmd = 0x04;
+
   // Response layout. Every response starts with a status byte; on error the
   // status byte (an error code) is the whole response.
 
@@ -112,9 +116,21 @@ class HardwareWalletService {
   /// response; that 64-byte form is what Ethereum addresses are hashed from.
   static const int publicKeyPos = statusCodeSize + publicKeyPrefixSize;
 
+  /// KDF params payload: algorithm (1) || m_cost KiB (u32 BE) ||
+  /// t_cost (u32 BE) || p_cost (u32 BE) || salt ([KdfService.saltSize]).
+  static const int kdfParamsSize = 1 + 3 * 4 + KdfService.saltSize;
+
+  /// Offsets of the fields inside a successful KDF params response.
+  static const int kdfAlgorithmPos = statusCodeSize;
+  static const int kdfMemoryPos = kdfAlgorithmPos + 1;
+  static const int kdfIterationsPos = kdfMemoryPos + 4;
+  static const int kdfParallelismPos = kdfIterationsPos + 4;
+  static const int kdfSaltPos = kdfParallelismPos + 4;
+
   /// Full successful responses: status byte + payload.
   static const int versionResponseSize = statusCodeSize + versionSize;
   static const int publicKeyResponseSize = statusCodeSize + publicKeySize;
+  static const int kdfParamsResponseSize = statusCodeSize + kdfParamsSize;
   static const int signatureSuccessResponseSize =
       statusCodeSize + signatureSize;
 
@@ -163,6 +179,9 @@ class HardwareWalletService {
 
   /// How long to wait for the device to answer a public key request.
   static const Duration publicKeyTimeout = Duration(seconds: 5);
+
+  /// How long to wait for the device to answer a KDF params request.
+  static const Duration kdfParamsTimeout = Duration(seconds: 5);
 
   bool _cancelSignatureRequested = false;
 
@@ -378,6 +397,55 @@ class HardwareWalletService {
     }
 
     return buffer.sublist(publicKeyPos);
+  }
+
+  /// Reads the per-device salt and Argon2 costs; no password needed.
+  /// Throws [HardwareWalletException] on transport/device errors, or if the
+  /// device does not answer within [kdfParamsTimeout].
+  Future<KdfParams> getKdfParams() async {
+    final ok = await SerialService().write([getKdfParamsCmd]);
+    if (ok == null) {
+      throw HardwareWalletException('Can not connect to the device');
+    }
+
+    Uint8List? buffer = Uint8List(0);
+    try {
+      final stopwatch = Stopwatch()..start();
+      while (buffer!.isEmpty) {
+        if (stopwatch.elapsed >= kdfParamsTimeout) {
+          throw HardwareWalletException('Device did not respond');
+        }
+        await Future.delayed(readTimeout);
+        buffer = await SerialService().read(kdfParamsResponseSize);
+        // null: port is not open and can not be reopened.
+        if (buffer == null) {
+          throw HardwareWalletException('Lost connection to the device');
+        }
+      }
+    } on HardwareWalletException {
+      rethrow;
+    } catch (_) {
+      // Port vanished mid-read (e.g. device unplugged).
+      throw HardwareWalletException('Lost connection to the device');
+    } finally {
+      SerialService().close();
+    }
+
+    if (buffer[0] != successCode) {
+      throw HardwareWalletException.fromCode(buffer[0]);
+    }
+    if (buffer.length != kdfParamsResponseSize) {
+      throw HardwareWalletException('Unexpected device response');
+    }
+
+    final data = ByteData.sublistView(buffer);
+    return KdfParams(
+      algorithm: buffer[kdfAlgorithmPos],
+      memoryKib: data.getUint32(kdfMemoryPos, Endian.big),
+      iterations: data.getUint32(kdfIterationsPos, Endian.big),
+      parallelism: data.getUint32(kdfParallelismPos, Endian.big),
+      salt: buffer.sublist(kdfSaltPos),
+    );
   }
 
   void dispose() {

@@ -12,7 +12,8 @@ license = "MIT"
 [workspace.dependencies]
 dotenvy = "0.15.7"
 aes-gcm = "0.11.0"
-tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
+zeroize = "1"
 rand = "0.8"
 hex = "0.4.3"
 secp256k1 = "0.31.1"

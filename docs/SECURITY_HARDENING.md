@@ -7,15 +7,18 @@ Notes on how the seed encryption key is derived today, what is weak about it, an
 **Provisioning** (`utils/key-encryption/src/main.rs`):
 
 ```
-password (ENCRYPTION_KEY) → keccak256 → 32-byte AES key → AES-256-GCM encrypt seed → input.h → flashed to device
+password (ENCRYPTION_KEY) + random 32-byte salt → Argon2id(m, t, p) → 32-byte AES key → AES-256-GCM encrypt seed → input.h (blob + salt + m/t/p) → flashed to device
 ```
 
 **Usage** (`seed_silo/lib/services/transaction_service.dart`):
 
 ```
-app:    password → keccak256 → 32 bytes ──USB──▶
+app:    CMD_GET_KDF_PARAMS ──USB──▶ device returns KDF id, m, t, p, salt
+app:    password → Argon2id(password, salt, m, t, p) → 32 bytes ──USB──▶
 device: use 32 bytes directly as AES key → AES-GCM decrypt seed → sign
 ```
+
+Step 1 below (Argon2id + per-device salt) is implemented; the weaknesses list describes the original Keccak design.
 
 ## Weaknesses
 

@@ -2,6 +2,7 @@ import 'package:convert/convert.dart';
 import 'package:eip1559/eip1559.dart';
 import 'package:flutter/foundation.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
+import 'package:seed_silo/services/kdf_service.dart';
 import 'package:seed_silo/utils/nullify.dart';
 import 'package:wallet/wallet.dart';
 import 'package:web3dart/web3dart.dart';
@@ -158,9 +159,25 @@ class TransactionService {
     return buffer.toString();
   }
 
+  /// Fetches the device's salt and Argon2id costs and derives the 32-byte
+  /// key the device decrypts the seed with. [textPassword] is zeroed.
+  /// Throws [HardwareWalletException] if the params can not be read, or
+  /// [KdfException] if they are unsupported.
+  Future<Uint8List> _deriveDeviceKey(Uint8List textPassword) async {
+    final KdfParams params;
+    try {
+      params = await HardwareWalletService().getKdfParams();
+    } catch (_) {
+      nullifyUint8List(textPassword);
+      rethrow;
+    }
+    return KdfService().deriveKey(textPassword, params);
+  }
+
   /// Signs [tx] on the device and broadcasts it. Returns the tx hash.
   /// Throws [HardwareWalletException] if the device fails or the user
-  /// rejects the transaction, or the RPC error if broadcasting fails.
+  /// rejects the transaction, [KdfException] if the device's KDF params are
+  /// unsupported, or the RPC error if broadcasting fails.
   /// [onSigned] is called once the device has signed, right before the
   /// broadcast starts.
   Future<String> sendTransaction(Uint8List textPassword, int posPassword,
@@ -171,8 +188,7 @@ class TransactionService {
       throw ArgumentError('Only EIP-1559 transactions are supported');
     }
 
-    final password = keccak256(textPassword);
-    nullifyUint8List(textPassword);
+    final password = await _deriveDeviceKey(textPassword);
 
     final rawTransaction = tx.getUnsignedSerialized(chainId: chainId);
     final sig = await HardwareWalletService()
@@ -191,10 +207,10 @@ class TransactionService {
     return sendTxHash;
   }
 
-  /// Throws [HardwareWalletException] if the device fails or does not answer.
+  /// Throws [HardwareWalletException] if the device fails or does not answer,
+  /// or [KdfException] if the device's KDF params are unsupported.
   Future<String> getAddress(Uint8List textPassword, int posPassword) async {
-    final password = keccak256(textPassword);
-    nullifyUint8List(textPassword);
+    final password = await _deriveDeviceKey(textPassword);
     final publicKey = await HardwareWalletService()
         .getUncompressedPublicKey(password, posPassword);
 

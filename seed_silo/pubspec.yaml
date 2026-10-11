@@ -40,6 +40,7 @@ dependencies:
   provider: ^6.1.5+1
   wallet: ^0.0.18
   eip1559: ^0.6.2
+  hashlib: ^2.4.2
 
 dev_dependencies:
   flutter_test:

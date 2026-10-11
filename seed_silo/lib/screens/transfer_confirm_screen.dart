@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:seed_silo/models/network.dart';
 import 'package:seed_silo/screens/transaction_sign_screen.dart';
 import 'package:seed_silo/services/hardware_wallet_service.dart';
+import 'package:seed_silo/services/kdf_service.dart';
 import 'package:seed_silo/services/transaction_service.dart';
 import 'package:seed_silo/widgets/submit_slider.dart';
 import 'package:seed_silo/models/token.dart';
@@ -71,6 +72,9 @@ class _TransferConfirmScreenState extends State<TransferConfirmScreen> {
         passwordPos,
       );
     } on HardwareWalletException catch (e) {
+      _showError('Can not receive wallet address: $e');
+      return;
+    } on KdfException catch (e) {
       _showError('Can not receive wallet address: $e');
       return;
     }

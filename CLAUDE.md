@@ -38,8 +38,8 @@ pio device monitor -b 115200         # serial monitor
 ### Architecture
 
 - `firmware/include/core/` is the board-agnostic core: command dispatch, crypto, constants. Shared by both board entry points in `firmware/src/<board>/main.cpp`.
-- `firmware/include/core/constants.h` defines the serial protocol: command bytes (`CMD_GET_VERSION`, `CMD_GET_PUBKEY`, `CMD_SIGN`) and response/error codes (`CORE_SUCCESS`, `CORE_ERR_*`). This file is the source of truth for the wire protocol and must stay in sync with `seed_silo/lib/services/hardware_wallet_service.dart` on the app side.
-- `firmware/include/core/command_handlers.h` implements the three commands by reading fixed-format requests off `Serial` and writing fixed-format responses back. Each handler: decrypts the private key from the encrypted seed blob at a given `pos` (`decrypt_private_key`), does the crypto op, zeroes secrets, responds.
+- `firmware/include/core/constants.h` defines the serial protocol: command bytes (`CMD_GET_VERSION`, `CMD_GET_PUBKEY`, `CMD_SIGN`, `CMD_GET_KDF_PARAMS`) and response/error codes (`CORE_SUCCESS`, `CORE_ERR_*`). This file is the source of truth for the wire protocol and must stay in sync with `seed_silo/lib/services/hardware_wallet_service.dart` on the app side.
+- `firmware/include/core/command_handlers.h` implements the commands by reading fixed-format requests off `Serial` and writing fixed-format responses back. Each handler: decrypts the private key from the encrypted seed blob at a given `pos` (`decrypt_private_key`), does the crypto op, zeroes secrets, responds.
 - `firmware/include/core/src/` holds the individual crypto steps (`decrypt_private_key`, `get_public_key`, `sign_message`, `secure_memzero`), built on `lib/secp256k1` and `lib/sha3_keccak`.
 - `firmware/lib/rlp_decoder` decodes raw RLP-encoded EIP-1559 transactions so the firmware can render a human-readable summary before asking the user to approve/reject a signature (see `print_eip1559_tx.cpp`, used only in the `lilygo_tdisplay_s3` variant with its TFT screen).
 - `main.cpp` per board owns the event loop and diverges meaningfully between boards: `lilygo_tdisplay_s3` reads a command, and for `CMD_SIGN` parses+displays the tx and waits for a physical button press (approve/reject) before calling `sign_cmd_response`. `esp32c3_super_mini` has no display wiring at all — its `CMD_SIGN` path calls `sign_cmd_get_msg_signature` and responds immediately, with no parsing, display, or user confirmation step. Treat this as a deliberate but security-relevant gap, not an oversight, when working on either board's flow.
@@ -63,6 +63,7 @@ flutter run                          # run on connected device/desktop
 - `lib/services/transaction_service.dart`, `network_service.dart`, `token_service.dart` — build/broadcast transactions, manage EVM network configs and token lists (persisted via `shared_preferences`).
 - `lib/providers/` — `ChangeNotifier`-based state (Provider package) for networks and tokens, consumed by screens.
 - `lib/screens/` — UI flow: preload → main → transfer → transfer confirm, plus network/token management screens.
+- `lib/services/kdf_service.dart` — Argon2id (`hashlib`, run in an isolate) turning the password into the 32-byte key sent to the device, using salt/costs read via `CMD_GET_KDF_PARAMS`. Must stay byte-compatible with `utils/key-encryption` (shared known-answer vector in both test suites).
 - `lib/utils/nullify.dart` — helpers to zero out sensitive `Uint8List`/`List<int>` buffers after use (passwords/keys); use when handling secrets in Dart, mirroring `secure_memzero` on the firmware side.
 
 ## Rust utils (`utils/`)
@@ -74,5 +75,5 @@ cd utils/<crate> && cargo build --release && cargo run
 ```
 
 - `key-generation` — generates a mnemonic/keypair (uses `alloy-signer-local`).
-- `key-encryption` — reads one or more `hex_private_key,position` pairs from `PRIVATE_KEYS` plus an `ENCRYPTION_KEY` env var, AES-256-GCM encrypts them into a 256-byte buffer, and prints a ready-to-use `input.h` (IV/ciphertext/tag `#define`s) to stdout — this is how you provision the constants firmware reads via `decrypt_private_key`. Has real unit tests: `cargo test`.
+- `key-encryption` — reads one or more `hex_private_key,position` pairs from `PRIVATE_KEYS` plus an `ENCRYPTION_KEY` env var, derives the AES key with Argon2id (random 32-byte salt; costs from `ARGON2_M_KIB`/`ARGON2_T`/`ARGON2_P`, default 64 MiB/3/1), AES-256-GCM encrypts them into a 256-byte buffer, and prints a ready-to-use `input.h` (IV/ciphertext/tag + KDF salt/costs `#define`s) to stdout — this is how you provision the constants firmware reads via `decrypt_private_key`. Has real unit tests: `cargo test`.
 - `sig-compare` — verifies that a signature produced by the device (or a local signer) matches what was broadcast on-chain; fetches transactions via the Etherscan API (`API_KEY`) or explicit `TX_HASHES`, and RPC (`RPC_URL`). See `utils/sig-compare/README.md` for full env var config (`PRIVATE_KEY`, `API_KEY`, `TX_HASHES`, `RPC_URL`, `TX_COUNT`).
